@@ -1,3 +1,4 @@
 *.log
-dataset/original
-dataset/processed
+dataset/original/*
+dataset/processed/*
+__pycache__

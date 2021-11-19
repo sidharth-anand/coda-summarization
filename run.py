@@ -13,7 +13,7 @@ if hostname == 'ccnt-ubuntu':
             os.system("rm -rf %s" % log)
 
         run = 'python preprocess.py ' \
-              '-data_name github-python ' \
+              '--data-name github-python ' \
               '-train_src dataset/processed/train_0.60.20.2.code ' \
               '-train_tgt dataset/processed/train_0.60.20.2.comment ' \
               '-train_xe_src dataset/processed/train_0.60.20.2.code ' \

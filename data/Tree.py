@@ -2,11 +2,12 @@ import ast
 import asttokens
 import re
 import copy
-from constants.constants import BOS_WORD, EOS_WORD,  PAD_WORD,  UNK_WORD, PAD_WORD, UNK_WORD, BOS_WORD, EOS_WORD, NODE_FIX
 
 from data.Dictionary import Dictionary
 
+from constants.constants import BOS_WORD, EOS_WORD,  PAD_WORD,  UNK_WORD, PAD_WORD, UNK_WORD, BOS_WORD, EOS_WORD, NODE_FIX
 
+#TODO: Clean up this retarded ass shit
 
 class Tree(object):
     def __init__(self):
@@ -42,7 +43,6 @@ class Tree(object):
         return self._depth
 
     def leaf_count_(self):
-        # count = 0
         if not self.children:
             self._leaf_count = 1
         else:
@@ -114,14 +114,14 @@ def make_vocabulary(opt, name, filename, size):
     return vocab
 
 
-def initVocabulary(opt, name, dataFile, vocabSize):
+def init_vocabulary(opt, name, dataFile, vocabSize):
     print('Building ' + name + ' vocabulary...')
     genWordVocab = make_vocabulary(opt, name, dataFile, vocabSize)
     vocab = genWordVocab
     return vocab
 
 
-def saveVocabulary(name, vocab, file):
+def save_vocabulary(name, vocab, file):
     print('Saving ' + name + ' vocabulary to \'' + file + '\'...')
     vocab.writeFile(file)
 

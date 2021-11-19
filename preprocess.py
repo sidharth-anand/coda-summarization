@@ -1,14 +1,22 @@
-# -*- coding: utf-8 -*-
 import argparse
 import codecs
-from data.Tree import python2tree, python_tokenize, traverse_python_tree, split_tree, merge_tree, initVocabulary
+import pickle
+
+from data.Tree import python2tree, python_tokenize, traverse_python_tree, split_tree, merge_tree, init_vocabulary
+
 from constants.constants import UNK_WORD, EOS_WORD
 
+#TODO: Clean up global options cancer
+#TODO: Add typing
+#TODO: Separate from run.py
+#TODO: Clean up arguments
+#TODO: Remove commented code
+#TODO: Improve AST saving/loading
 
-# from .Dict import Dict
 def get_opt():
     parser = argparse.ArgumentParser(description='preprocess.py')
-    parser.add_argument('-data_name', help="Data name")
+
+    parser.add_argument('--data-name', help="Data name")
     parser.add_argument("-train_src", required=True,
                         help="Path to the training source data")
     parser.add_argument("-train_tgt", required=True,
@@ -52,21 +60,20 @@ def get_opt():
     return opt
 
 
-def makeData(which, srcFile, tgtFile, srcDicts, tgtDicts):
+def make_data(which, source_file_path, target_file_path, source_dictionaries, target_dictonaries):
     src, tgt, trees = [], [], []
     code_sentences, comment_sentences = [], []
     sizes = []
     ignored, exceps = 0, 0
 
-    print('Processing %s & %s ...' % (srcFile, tgtFile))
-    srcF = codecs.open(srcFile, 'r', 'utf-8', errors='ignore')
-    tgtF = codecs.open(tgtFile, 'r', 'utf-8', errors='ignore')
+    print('Processing %s & %s ...' % (source_file_path, target_file_path))
+    source_flie = open(source_file_path, 'r', encoding='utf-8', errors='ignore')
+    target_file = open(target_file_path, 'r', encoding='utf-8', errors='ignore')
 
     while True:
-        sline = srcF.readline().strip()
-        tline = tgtF.readline().strip()
+        sline = source_flie.readline().strip()
+        tline = target_file.readline().strip()
 
-        # source or target does not have same number of lines
         if sline == '' or tline == '':
             print('WARNING: src and tgt do not have the same # of sentences')
             break
@@ -89,18 +96,14 @@ def makeData(which, srcFile, tgtFile, srcDicts, tgtDicts):
         # len(srcLine) <= opt.src_seq_length and
         if len(srcLine) <= opt.src_seq_length and len(tgtLine) <= opt.tgt_seq_length:
             try:
-                # Given a line of source code, build a tree and save it as dictionary
-
                 atok, tree = python2tree(sline)
-                tree_json = traverse_python_tree(atok, tree)
+                trees += [{
+                    'atok': atok,
+                    'tree': tree
+                }]
 
-                tree_json = split_tree(tree_json, len(tree_json))
-                tree_json = merge_tree(tree_json)
-                # if len(tree_json) < opt.src_seq_length:
-                trees += [tree_json]
-
-                src += [srcDicts.convert_to_index(srcLine, UNK_WORD)]
-                tgt += [tgtDicts.convert_to_index(tgtLine,
+                src += [source_dictionaries.convert_to_index(srcLine, UNK_WORD)]
+                tgt += [target_dictonaries.convert_to_index(tgtLine,
                                                   UNK_WORD, eos_word=EOS_WORD)]
                 sizes += [len(src)]
             except Exception as e:
@@ -111,8 +114,8 @@ def makeData(which, srcFile, tgtFile, srcDicts, tgtDicts):
             print('Too long')
             ignored += 1
 
-    srcF.close()
-    tgtF.close()
+    source_flie.close()
+    target_file.close()
 
     # print('... sorting sentences by size')
     # _, perm = torch.sort(torch.Tensor(sizes))
@@ -130,7 +133,7 @@ def makeData(which, srcFile, tgtFile, srcDicts, tgtDicts):
 def makeDataGeneral(which, src_path, tgt_path, dicts):
     print('Preparing ' + which + '...')
     res = {}
-    res['src'], res['tgt'], res['trees'], code_sentences, comment_sentences = makeData(
+    res['src'], res['tgt'], res['trees'], code_sentences, comment_sentences = make_data(
         which, src_path, tgt_path, dicts['src'], dicts['tgt'])
     return res, code_sentences, comment_sentences
 
@@ -138,9 +141,9 @@ def makeDataGeneral(which, src_path, tgt_path, dicts):
 def main():
 
     dicts = {}
-    dicts['src'] = initVocabulary(
+    dicts['src'] = init_vocabulary(
         opt, 'code', opt.train_src, opt.src_vocab_size)
-    dicts['tgt'] = initVocabulary(
+    dicts['tgt'] = init_vocabulary(
         opt, 'comment', opt.train_tgt, opt.tgt_vocab_size)
 
     print("code vocab size",dicts['src'].size)
@@ -161,19 +164,13 @@ def main():
     save_data['test'], test_code_sentences, test_comment_sentences = makeDataGeneral(
         'test', opt.test_src, opt.test_tgt, dicts)
 
-    print("Saving data to \"" + opt.save_data + ".train.pt\"...")
+    save_file_path = opt.save_data + '.train.pickle'
+    print("Saving data to \"" + save_file_path + "...")
 
-    # word2vec dump
-    # print('code_sentences: ', train_xe_code_sentences[0])
-    # print('comment_sentences: ', train_xe_comment_sentences[0])
-    # code_w2v_model = gensim.models.Word2Vec(train_xe_code_sentences, size=512, window=5, min_count=5, workers=16)
-    # code_w2v_model.save(opt.save_data + '.train_xe.code.gz')
-    # comment_w2v_model = gensim.models.Word2Vec(train_xe_comment_sentences, size=512, window=5, min_count=5, workers=16)
-    # comment_w2v_model.save(opt.save_data + '.train_xe.comment.gz')
-
+    with open(save_file_path, 'wb') as save_file:
+        pickle.dump(save_data, save_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     global opt
     opt = get_opt()
     main()
-    # takes about 40min
