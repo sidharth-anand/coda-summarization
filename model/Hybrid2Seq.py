@@ -17,3 +17,6 @@ class Hybrid2Seq(tf.keras.Model):
         self.text_encoder = TextEncoder(target_vocabulary_size)
         self.hybrid_decoder = HybridDecoder(target_vocabulary_size)
         self.generator = Generator(target_vocabulary_size)
+    
+    def train_step(self, data):
+        return super().train_step(data)
