@@ -62,7 +62,7 @@ def generate_and_save_pairs(dataset_path: str, save_path: str) -> None:
                     declbodies_lines = declbodies_file.readlines()
                     descriptions_lines = descriptions_file.readlines()
 
-                    for i in range(len(declbodies_lines)):
+                    for i in range(min(len(declbodies_lines),10000)):
                         code = clean_code(declbodies_lines[i])
                         comment = clean_comment(descriptions_lines[i])
 
