@@ -5,12 +5,13 @@ from BinaryTreeLeafModule import BinaryTreeLeafModule
 from BinaryTreeComposer import BinaryTreeComposer
 
 from constants.constants import UNK
+from data.Dictionary import Dictionary
 
 class CodeEncoder(tf.keras.Layer):
-    def __init__(self, dictonaries, source_vocabulary_size: int, hidden_state_size:int, word_embedding_size: int, num_layers:int = 1) -> None:
+    def __init__(self, dictionaries: Dictionary, source_vocabulary_size: int, hidden_state_size:int, word_embedding_size: int = 512, num_layers:int = 1) -> None:
         super(CodeEncoder, self).__init__()
 
-        self.dictonaries = dictonaries
+        self.dictonaries = dictionaries
         self.source_vocabulary_size = source_vocabulary_size
 
         self.word_lut = tf.keras.layers.Embedding(source_vocabulary_size, word_embedding_size)

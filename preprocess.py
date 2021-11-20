@@ -98,10 +98,12 @@ def make_data(which, source_file_path, target_file_path, source_dictionaries, ta
         if len(srcLine) <= opt.src_seq_length and len(tgtLine) <= opt.tgt_seq_length:
             try:
                 atok, tree = python2tree(sline)
-                trees += [{
-                    'atok': atok,
-                    'tree': tree
-                }]
+                tree_json = traverse_python_tree(atok,tree)
+                # trees += [{
+                #     'atok': atok,
+                #     'tree': tree
+                # }]
+                trees += [tree_json]
 
                 src += [source_dictionaries.convert_to_index(srcLine, UNK_WORD)]
                 tgt += [target_dictonaries.convert_to_index(tgtLine,

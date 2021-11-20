@@ -1,21 +1,22 @@
 from __future__ import division
 import argparse
-from typing import Generator
-import torch
-import torch.nn as nn
-from torch import cuda
-import lib
+from constants.constants import UNK_WORD
+from data.Tree import Tree, json2tree_binary
+from loss.Loss import weighted_mse
+from model.CodeEncoder import CodeEncoder
+from model.HybridDecoder import HybridDecoder
+from model.TextEncoder import TextEncoder
+from model.Hybrid2Seq import Hybrid2Seq
+from model.Generator import Generator
 import os
 import sys
-
 import datetime
 import numpy as np
 import os.path
-from torch.autograd import Variable
 import random
-from lib.data.Tree import *
 import time
 import pickle
+import tensorflow as tf
 
 def get_opt():
     parser = argparse.ArgumentParser(description='a2c-train.py')
@@ -79,15 +80,15 @@ def get_data_trees(trees):
         tree = json2tree_binary(t_json, Tree(), root_idx)
         data_trees.append(tree)
 
-    return data_trees
+    return np.array(data_trees)
 
 def get_data_leafs(trees, srcDicts):
     leafs = []
     for tree in trees:
         leaf_contents = tree.leaf_contents()
 
-        leafs.append(srcDicts.convertToIdx(leaf_contents, Constants.UNK_WORD))
-    return leafs
+        leafs.append(srcDicts.convertToIdx(leaf_contents, UNK_WORD))
+    return np.array(leafs)
 
 def sort_test(dataset):
     if opt.var_type == 'code':
@@ -104,6 +105,15 @@ def load_data(filename, batch_size):
 
     dicts = dataset['dicts']
 
+    dataset["train_xe"]['trees'] = get_data_trees(dataset["train_xe"]['trees'])
+    dataset["train_pg"]['trees'] = get_data_trees(dataset["train_pg"]['trees'])
+    dataset["valid"]['trees'] = get_data_trees(dataset["valid"]['trees'])
+    dataset["test"]['trees'] = get_data_trees(dataset["test"]['trees'])
+
+    dataset["train_xe"]['leafs'] = get_data_leafs(dataset["train_xe"]['trees'], dicts['src'])
+    dataset["train_pg"]['leafs'] = get_data_leafs(dataset["train_pg"]['trees'], dicts['src'])
+    dataset["valid"]['leafs'] = get_data_leafs(dataset["valid"]['trees'], dicts['src'])
+    dataset["test"]['leafs'] = get_data_leafs(dataset["test"]['trees'], dicts['src'])
 
     supervised_data_gen = Generator(dataset["train_xe"], batch_size)
     rl_data_gen = Generator(dataset["train_pg"], batch_size)
@@ -129,47 +139,24 @@ def create_optim(model):
     )
     return optim
 
-def create_model(model_class, dicts, gen_out_size):
-    if opt.data_type == 'code':
-        encoder = lib.TreeEncoder(opt, dicts["src"])
-        decoder = lib.TreeDecoder(opt, dicts["tgt"])
-    elif opt.data_type == 'text':
-        encoder = lib.Encoder(opt, dicts["src"])
-        decoder = lib.TreeDecoder(opt, dicts["tgt"])
-    elif opt.data_type == 'hybrid':
-        code_encoder = lib.TreeEncoder(opt, dicts["src"])
-        text_encoder = lib.Encoder(opt, dicts["src"])
-        decoder = lib.HybridDecoder(opt, dicts["tgt"])
+def create_model(dicts):
+    
+    # code_encoder = lib.TreeEncoder(opt, dicts["src"])
+    # text_encoder = lib.Encoder(opt, dicts["src"])
+    # decoder = lib.HybridDecoder(opt, dicts["tgt"])
+
+    
 
     # Use memory efficient generator when output size is large and
     # max_generator_batches is smaller than batch_size.
-    if opt.max_generator_batches < opt.batch_size and gen_out_size > 1:
-        generator = lib.MemEfficientGenerator(nn.Linear(opt.rnn_size, gen_out_size), opt)
-    else:
-        generator = lib.BaseGenerator(nn.Linear(opt.rnn_size, gen_out_size), opt)
-    if opt.data_type == 'code' or opt.data_type == 'text':
-        model = model_class(encoder, decoder, generator, opt)
-    elif opt.data_type == 'hybrid':
-        model = model_class(code_encoder, text_encoder, decoder, generator, opt)
-    init(model)
-    optim = create_optim(model)
+    
+    
+    model = Hybrid2Seq(dicts, dicts['src'].size(),dicts['tgt'].size())
+    
 
-    return model, optim
+    return model
 
-def create_critic(checkpoint, dicts, opt):
-    if opt.load_from is not None and "critic" in checkpoint:
-        critic = checkpoint["critic"]
-        critic_optim = checkpoint["critic_optim"]
-    else:
-        if opt.data_type == 'code':
-            critic, critic_optim = create_model(lib.Tree2SeqModel, dicts, 1)
-        elif opt.data_type == 'text':
-            critic, critic_optim = create_model(lib.Seq2SeqModel, dicts, 1)
-        elif opt.data_type == 'hybrid':
-            critic, critic_optim = create_model(lib.Hybrid2SeqModel, dicts, 1)
-    if opt.cuda:
-        critic.cuda(opt.gpus[0])
-    return critic, critic_optim
+
 
 def main():
     print("Start...")
@@ -182,37 +169,27 @@ def main():
     
 
 
-    dicts, supervised_data, rl_data, valid_data, test_data, vis_data = load_data(opt.data,opt.batch_size)
+    dicts, supervised_data_gen, rl_data_gen, valid_data_gen, test_data_gen, vis_data_gen = load_data(opt.data,opt.batch_size)
 
     print("Building model...")
 
     use_critic = opt.start_reinforce is not None
     print("use_critic: ", use_critic)
 
-    model, optim = create_model(lib.Hybrid2SeqModel, dicts, dicts["tgt"].size())
+    model = create_model(Hybrid2Seq, dicts, dicts["tgt"].size())
 
-    # GPU.
-    if opt.cuda:
-        model.cuda(opt.gpus[0])
+    
 
-    # Start reinforce training immediately.
-    print("opt.start_reinforce: ", opt.start_reinforce)
-    if opt.start_reinforce == -1:
-        opt.start_decay_at = opt.start_epoch
-        opt.start_reinforce = opt.start_epoch
+    
 
-    # Check if end_epoch is large enough.
-    if use_critic:
-        assert opt.start_epoch + opt.critic_pretrain_epochs - 1 <= \
-               opt.end_epoch, "Please increase -end_epoch to perform pretraining!"
+    
 
-    nParams = sum([p.nelement() for p in model.parameters()])
-    print("* number of parameters: %d" % nParams)
+    
 
     # Metrics.
     metrics = {}
-    metrics["xent_loss"] = lib.Loss.weighted_xent_loss
-    metrics["critic_loss"] = lib.Loss.weighted_mse
+    metrics["xent_loss"] = tf.nn.weighted_cross_entropy_with_logits
+    metrics["critic_loss"] = weighted_mse
     metrics["sent_reward"] = lib.Reward.sentence_bleu
     metrics["corp_reward"] = lib.Reward.corpus_bleu
     if opt.pert_func is not None:
@@ -222,62 +199,30 @@ def main():
     print("opt.eval_sample: ", opt.eval_sample)
 
     # Evaluate model on heldout dataset.
-    if opt.eval:
-        evaluator = lib.Evaluator(model, metrics, dicts, opt)
-        # On validation set.
-        if opt.var_length:
-            pred_file = opt.load_from.replace(".pt", ".valid.pred.var"+opt.var_type)
-        else:
-            pred_file = opt.load_from.replace(".pt", ".valid.pred")
-        evaluator.eval(valid_data, pred_file)
 
-        # On test set.
-        if opt.var_length:
-            pred_file = opt.load_from.replace(".pt", ".test.pred.var"+opt.var_type)
-        else:
-            pred_file = opt.load_from.replace(".pt", ".test.pred")
-        evaluator.eval(test_data, pred_file)
-    elif opt.eval_one:
-        print("eval_one..")
-        evaluator = lib.Evaluator(model, metrics, dicts, opt)
-        # On test set.
-        pred_file = opt.load_from.replace(".pt", ".test_one.pred")
-        evaluator.eval(vis_data, pred_file)
-    elif opt.eval_sample:
-        opt.no_update = True
-        critic, critic_optim = create_critic(checkpoint, dicts, opt)
-        reinforce_trainer = lib.ReinforceTrainer(model, critic, rl_data, test_data,
-                                                 metrics, dicts, optim, critic_optim, opt)
-        reinforce_trainer.train(opt.start_epoch, opt.start_epoch, False)
+    
+    # xent_trainer = Trainer(model, supervised_data, valid_data, metrics, dicts, optim, opt)
+    
+    start_time = time.time()
+    # Supervised training.
+    print("supervised training..")
+    print("start_epoch: ", opt.start_epoch)
 
-    else:
-        print("supervised_data.src: ", len(supervised_data.src))
-        print("supervised_data.tgt: ", len(supervised_data.tgt))
-        print("supervised_data.trees: ", len(supervised_data.trees))
-        print("supervised_data.leafs: ", len(supervised_data.leafs))
-        xent_trainer = lib.Trainer(model, supervised_data, valid_data, metrics, dicts, optim, opt)
-        if use_critic:
-            start_time = time.time()
-            # Supervised training.
-            print("supervised training..")
-            print("start_epoch: ", opt.start_epoch)
+    # xent_trainer.train(opt.start_epoch, opt.start_reinforce - 1, start_time)
+    # # Create critic here to not affect random seed.
+    # critic = create_model(dicts)
+    # # Pretrain critic.
+    # print("pretrain critic...")
+    # if opt.critic_pretrain_epochs > 0:
+    #     reinforce_trainer = lib.ReinforceTrainer(model, critic, supervised_data, test_data, metrics, dicts, optim, critic_optim, opt)
+    #     reinforce_trainer.train(opt.start_reinforce, opt.start_reinforce + opt.critic_pretrain_epochs - 1, True, start_time)
+    # # Reinforce training.
+    # print("reinforce training...")
+    # reinforce_trainer = lib.ReinforceTrainer(model, critic, rl_data, test_data, metrics, dicts, optim, critic_optim, opt)
+    # reinforce_trainer.train(opt.start_reinforce + opt.critic_pretrain_epochs, opt.end_epoch, False, start_time)
 
-            xent_trainer.train(opt.start_epoch, opt.start_reinforce - 1, start_time)
-            # Create critic here to not affect random seed.
-            critic, critic_optim = create_critic(checkpoint, dicts, opt)
-            # Pretrain critic.
-            print("pretrain critic...")
-            if opt.critic_pretrain_epochs > 0:
-                reinforce_trainer = lib.ReinforceTrainer(model, critic, supervised_data, test_data, metrics, dicts, optim, critic_optim, opt)
-                reinforce_trainer.train(opt.start_reinforce, opt.start_reinforce + opt.critic_pretrain_epochs - 1, True, start_time)
-            # Reinforce training.
-            print("reinforce training...")
-            reinforce_trainer = lib.ReinforceTrainer(model, critic, rl_data, test_data, metrics, dicts, optim, critic_optim, opt)
-            reinforce_trainer.train(opt.start_reinforce + opt.critic_pretrain_epochs, opt.end_epoch, False, start_time)
-
-        # Supervised training only.
-        else:
-            xent_trainer.train(opt.start_epoch, opt.end_epoch)
+    # Supervised training only.
+    
 
 if __name__ == '__main__':
     main()
