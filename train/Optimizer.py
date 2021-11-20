@@ -1,0 +1,1 @@
+#TODO: Create custom learning rate shit here and use it when creating tf optimizer
