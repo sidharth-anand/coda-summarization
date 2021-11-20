@@ -28,7 +28,7 @@ class Trainer:
             print('* CorssEntropy Epoch *')
             print(f'Model optimizer LearningRate: {self.optimizer.learning_rate}')
 
-            train_loss = self.train_epoch(epoch)
+            train_loss = self.train_epoch(epoch, start_time)
 
             print(f'Train perplexity: {math.exp(min(train_loss, 100))}')
 
