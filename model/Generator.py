@@ -11,7 +11,8 @@ class Generator(tf.keras.Model):
     def call(self, inputs):
         return self.linear(inputs)
 
-    def predict(inputs):
+    #TODO: is this shit really correct?
+    def predict(self, inputs):
         logits = self.call(inputs)
         predictions = tf.math.argmax(logits, axis=-1)
 
