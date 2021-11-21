@@ -119,7 +119,8 @@ class Dictionary:
         if eos_word is not None:
             vec.append(self.lookup(eos_word))
 
-        return tf.convert_to_tensor(vec)
+        # return tf.convert_to_tensor(vec)
+        return vec
 
     def convert_to_labels(self, indices: typing.List[int], stop: int) -> typing.List[str]:
         labels = []

@@ -10,10 +10,10 @@ from train.Evaluator import Evaluator
 from constants.constants import PAD
 
 class Trainer:
-    def __init__(self, model, train_data, validation_data, metrics, dictionaries, optimizer, iterations_per_log = 100):
+    def __init__(self, model, train_data_gen, validation_data_gen, metrics, dictionaries, optimizer, iterations_per_log = 100):
         self.model = model
-        self.train_data = train_data
-        self.validation_data = validation_data
+        self.train_data_gen = train_data_gen
+        self.validation_data_gen = validation_data_gen
         self.evaluator = Evaluator(model, metrics, dictionaries)
         self.dictionaries = dictionaries
         self.optimizer = optimizer
@@ -25,14 +25,14 @@ class Trainer:
         start_time = time.time()
 
         for epoch in range(start_epoch, end_epoch + 1):
-            print('* CorssEntropy Epoch *')
+            print('* CrossEntropy Epoch *')
             print(f'Model optimizer LearningRate: {self.optimizer.learning_rate}')
 
             train_loss = self.train_epoch(epoch, start_time)
 
             print(f'Train perplexity: {math.exp(min(train_loss, 100))}')
 
-            validation_loss, validation_sentence_reward, validation_corpus_reward = self.evaluator.evaluate(self.validation_data)
+            validation_loss, validation_sentence_reward, validation_corpus_reward = self.evaluator.evaluate(self.validation_data_gen)
             validation_perplexity = math.exp(min(validation_loss, 100))
 
             print(f'Validation perplexity: {validation_perplexity}')
@@ -44,7 +44,7 @@ class Trainer:
             #TODO: checkpoint the model here
 
     def train_epoch(self, epoch_index: int, training_start):
-        self.model.train()
+        # self.model.train()
 
         total_loss = 0
         reported_loss = 0
@@ -54,8 +54,8 @@ class Trainer:
 
         last_reported_time = time.time()
 
-        for i in range(len(self.train_data)):
-            batch = self.train_data[i]
+        for i in range(len(self.train_data_gen)):
+            batch = self.train_data_gen[i]
 
             targets = batch[2]
             code_attention_mask = tf.math.equal(batch[1][2][0], tf.constant(PAD))
@@ -76,7 +76,7 @@ class Trainer:
             total_words += num_words
 
             if i % self.iterations_per_log == 0 and i > 0:
-                print(f'Epoch {epoch_index} --- {i}/{len(self.train_data)} batches --- perplexity: {math.exp(reported_loss / reported_words)} --- {time.time() - last_reported_time} tokens/second --- {time.time() - training_start}s since training start')
+                print(f'Epoch {epoch_index} --- {i}/{len(self.train_data_gen)} batches --- perplexity: {math.exp(reported_loss / reported_words)} --- {time.time() - last_reported_time} tokens/second --- {time.time() - training_start}s since training start')
 
                 reported_loss = 0
                 reported_words = 0

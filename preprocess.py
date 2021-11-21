@@ -126,9 +126,9 @@ def make_data(which, source_file_path, target_file_path, source_dictionaries, ta
     # tgt = [tgt[idx] for idx in perm]
     # trees = [trees[idx] for idx in perm]
 
-    src = np.array(src)
-    tgt = np.array(tgt)
-    trees = np.array(trees)
+    # src = np.array(src)
+    # tgt = np.array(tgt)
+    # trees = np.array(trees)
 
     print(('Prepared %d sentences ' +
           '(%d ignored due to length == 0 or src len > %d or tgt len > %d)') %
