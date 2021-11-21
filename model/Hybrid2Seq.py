@@ -5,7 +5,7 @@ from TextEncoder import TextEncoder
 from HybridDecoder import HybridDecoder
 from Generator import Generator
 
-from constants.constants import BOS, EOS
+from constants.constants import BOS, EOS, PAD
 
 #TODO: figure out backprop and loss
 class Hybrid2Seq(tf.keras.Model):
@@ -28,11 +28,13 @@ class Hybrid2Seq(tf.keras.Model):
 
     #TODO: add typing to this shit
     #TODO: eval???
-    def initialize(self, inputs, eval: bool):
-        target = inputs[2]
-        trees = inputs[1][0]
-        lengths = inputs[1][1]
-        source_text = inputs[0]
+    def initialize(self, batch, eval: bool):
+        # batch format
+        # return (make_tensor(batch_src),src_lengths), (batch_trees,tree_lengths, (make_tensor(batch_leafs),leaf_lengths)) , make_tensor(batch_tgt), range(len(batch_src))
+        target = batch[2]
+        trees = batch[1][0]
+        lengths = batch[1][1]
+        source_text = batch[0]
         
         tree_encoder_context_padded = []
         tree_encoder_hidden_0 = []
@@ -56,8 +58,8 @@ class Hybrid2Seq(tf.keras.Model):
         return target, (embedding, initial_output, tree_encoder_hidden, tf.transpose(tree_encoder_context_padded, [0, 1]), text_encoder_hidden, tf.transpose(text_encoder_context, [0, 1]))
 
     #TODO: add typing to this shit
-    def call(self, inputs, eval, training=False):
-        targets, initial_states = self.initialize(inputs, eval)
+    def call(self, batch, eval, training=False):
+        targets, initial_states = self.initialize(batch, eval)
         outputs = self.decoder(targets, initial_states)
 
         if training:
@@ -65,6 +67,29 @@ class Hybrid2Seq(tf.keras.Model):
             return tf.reshape(logits, targets.shape)
         
         return outputs
+    @tf.function
+    def train_step(self, batch):
+
+        with tf.GradientTape() as tape:
+
+            targets = batch[2]
+            code_attention_mask = tf.math.equal(batch[1][2][0], tf.constant(PAD))
+            text_attention_mask = tf.math.equal(batch[0][0], tf.constant(PAD))
+            self.hybrid_decoder.attention.apply_mask(code_attention_mask, text_attention_mask)
+            
+            logits = self.call(batch,False,training=True)
+
+            loss_weights = tf.math.not_equal(targets, tf.constant(PAD, dtype=tf.float64))
+            num_words = tf.reduce_sum(loss_weights)
+            
+            
+            loss = tf.nn.weighted_cross_entropy_with_logits(targets,logits,loss_weights)
+
+            grads = tape.gradient(loss, self.trainable_variables)
+            self.optimizer.apply_gradients(grads,self.trainable_variables)
+        return {
+            'loss': loss
+        }
 
     #TODO: this is wrong
     def predict(self, outputs):
