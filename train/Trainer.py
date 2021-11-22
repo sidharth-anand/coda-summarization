@@ -4,7 +4,6 @@ import os
 import time
 
 import tensorflow as tf
-from tensorflow.keras import optimizers
 
 from train.Evaluator import Evaluator
 
@@ -23,7 +22,6 @@ class Trainer:
         self.loss_function = metrics['xent_loss']
 
     def train(self, start_epoch, end_epoch):
-        
         epochs = end_epoch + 1 - start_epoch
         self.model.compile(optimizer=tf.keras.optimizers.Adam)
         self.model.fit(x=self.train_data_gen, epochs=epochs, validation_data=self.validation_data_gen)

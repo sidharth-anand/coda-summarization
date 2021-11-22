@@ -92,45 +92,57 @@ class ReinforceTrainer:
         last_reported_time = time.time()
 
         for i in range(len(self.training_data)):
-            batch = self.training_data[i]
+            with tf.GradientTape() as actor_tape:
+                with tf.GradientTape() as critic_tape:
+                    batch = self.training_data[i]
 
-            targets = batch[2]
-            code_attention_mask = tf.math.equal(batch[1][2][0], tf.constant(PAD))
-            text_attention_mask = tf.math.equal(batch[0][0], tf.constant(PAD))
+                    targets = batch[2]
+                    code_attention_mask = tf.math.equal(batch[1][2][0], tf.constant(PAD))
+                    text_attention_mask = tf.math.equal(batch[0][0], tf.constant(PAD))
 
-            batch_size = targets.shape[1]
+                    batch_size = targets.shape[1]
 
-            #TODO: these are pt methods. change to tf equivalents
-            self.actor.zero_grad()
-            self.critic.zero_grad()
+                    #TODO: these are pt methods. change to tf equivalents
+                    self.actor.zero_grad()
+                    self.critic.zero_grad()
 
-            self.model.hybrid_decoder.attention.apply_mask(code_attention_mask, text_attention_mask)
+                    self.model.hybrid_decoder.attention.apply_mask(code_attention_mask, text_attention_mask)
 
-            samples, outputs = self.actor.sample(batch, self.max_length)
+                    samples, outputs = self.actor.sample(batch, self.max_length)
 
-            rewards, samples = self.sentence_reward_function(samples, targets)
-            total_reward = tf.reduce_sum(rewards)
+                    rewards, samples = self.sentence_reward_function(samples, targets)
+                    total_reward = tf.reduce_sum(rewards)
 
-            #TODO: add reward shaping here
+                    #TODO: add reward shaping here
 
-            samples = tf.Variable(samples)
-            rewards = tf.Variable(rewards)
+                    samples = tf.Variable(samples)
+                    rewards = tf.Variable(rewards)
 
-            critic_loss_weights = tf.math.not_equal(samples, tf.constant(PAD, dtype=tf.float64))
-            num_words = tf.reduce_sum(critic_loss_weights)
+                    critic_loss_weights = tf.math.not_equal(samples, tf.constant(PAD, dtype=tf.float64))
+                    num_words = tf.reduce_sum(critic_loss_weights)
 
-            if not no_update:
-                baselines = self.critic((batch[0], batch[1], samples, batch[3]), eval=False, regression=True)
-            else:
-                critic_loss = 0
+                    if not no_update:
+                        baselines = self.critic((batch[0], batch[1], samples, batch[3]), eval=False, regression=True)
+                        
+                        critic_loss = tf.nn.weighted_cross_entropy_with_logits(baselines, rewards, critic_loss_weights)
+                        grads = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
+                        self.critic.optimizer.apply_gradients(grads, self.critic.trainable_variables)
+                    else:
+                        critic_loss = 0
 
-            if not pretrain_critic and not no_update:
-                normalized_rewards = tf.Variable(rewards - baselines)
-                actor_loss_weights = tf.math.not_equal(samples, tf.constant(PAD, dtype=tf.float64))
-                actor_loss = self.actor.backward(outputs, samples, actor_loss_weights, 1, self.actor_loss_function)
-                self.actor_optimizer.step()
-            else:
-                actor_loss = 0
+                    if not pretrain_critic and not no_update:
+                        normalized_rewards = tf.Variable(rewards - baselines)
+                        actor_loss_weights = tf.math.mul(normalized_rewards, critic_loss_weights)
+
+                        actor_loss = tf.nn.weighted_cross_entropy_with_logits(outputs, samples, actor_loss_weights)
+                        grads = actor_tape.gradient(actor_loss, self.actor.trainable_variables)
+                        self.actor.optimizer.apply_gradients(grads, self.actor.trainable_variables)
+                        
+                        self.actor_optimizer.step()
+                    else:
+                        actor_loss = 0
+
+                    
             
             total_reward += total_reward
             reported_reward += rewards
