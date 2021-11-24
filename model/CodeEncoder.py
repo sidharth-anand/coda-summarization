@@ -1,14 +1,14 @@
 import tensorflow as tf
 import numpy as np
 
-from BinaryTreeLeafModule import BinaryTreeLeafModule
-from BinaryTreeComposer import BinaryTreeComposer
+from model.BinaryTreeLeafModule import BinaryTreeLeafModule
+from model.BinaryTreeComposer import BinaryTreeComposer
 
 from constants.constants import UNK
 from data.Dictionary import Dictionary
 
-class CodeEncoder(tf.keras.Layer):
-    def __init__(self, dictionaries: Dictionary, source_vocabulary_size: int, hidden_state_size:int, word_embedding_size: int = 512, num_layers:int = 1) -> None:
+class CodeEncoder(tf.keras.layers.Layer):
+    def __init__(self, dictionaries: Dictionary, source_vocabulary_size: int, hidden_state_size: int = 512, word_embedding_size: int = 512, num_layers: int = 1) -> None:
         super(CodeEncoder, self).__init__()
 
         self.dictonaries = dictionaries
@@ -20,23 +20,22 @@ class CodeEncoder(tf.keras.Layer):
 
     def call(self, tree, lengths):
         if not tree.children:
-            node = self.word_lut(tf.Tensor([self.dictonaries.lookup(tree.content, UNK)]))
-            
-            return self.leaf_module(node, lengths)
+            node = self.word_lut(tf.convert_to_tensor([self.dictonaries.lookup(tree.content, UNK)]))
+            return self.leaf_module(node)
         elif tree.children:
-            left_output, (left_current, left_hidden) = self.call(input, tree.children[0], lengths)
-            right_output, (right_current, right_hidden) = self.call(input, tree.children[1], lengths)
+            left_output, (left_current, left_hidden) = self.call(tree.children[0], lengths)
+            right_output, (right_current, right_hidden) = self.call(tree.children[1], lengths)
+           
             state = self.tree_composer(left_current, left_hidden, right_current, right_hidden)
-            output = tf.concat([left_output, right_output], axis=-1)
+            output = tf.concat([left_output, right_output], axis=0)
 
             if not tree.parent:
-                output = tf.expand_dims(output, axis=1)
+                output = tf.expand_dims(output, axis=0)
 
-                if np.max(lengths) > output.size()[0]:
-                    output = tf.concat([output, tf.zeros((supl, output.size()[1], output.size()[2]))], axis=0)
+                if np.max(lengths) > output.shape[1]:
+                    output = tf.concat([output, tf.zeros((output.shape[0], np.max(lengths) - output.shape[1], output.shape[2]))], axis=1)
                 
-                state[0] = tf.expand_dims(state[0], axis=1)
-                state[1] = tf.expand_dims(state[1], axis=1)
+                state = (tf.expand_dims(state[0], axis=1), tf.expand_dims(state[1], axis=1))
             
             return output, state
 

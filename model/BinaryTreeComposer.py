@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-class BinaryTreeComposer(tf.keras.Layer):
+class BinaryTreeComposer(tf.keras.layers.Layer):
     def __init__(self, hidden_state_size: int, gate_output: bool=False) -> None:
         super(BinaryTreeComposer, self).__init__()
 

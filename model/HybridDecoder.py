@@ -1,10 +1,10 @@
 import tensorflow as tf
 
-from HybridAttention import HybridAttention
-from StackedLSTM import StackedLSTM
+from model.HybridAttention import HybridAttention
+from model.StackedLSTM import StackedLSTM
 
-class HybridDecoder(tf.keras.Layer):
-    def __init__(self, num_layers: int, hidden_state_size: int, target_vocab_size: int, dropout: float = 0.3, use_attention: bool = True) -> None:
+class HybridDecoder(tf.keras.layers.Layer):
+    def __init__(self, target_vocab_size: int, hidden_state_size: int = 512, num_layers: int = 1,   dropout: float = 0.3, use_attention: bool = True) -> None:
         super(HybridDecoder, self).__init__()
 
         self.hidden_state_size = hidden_state_size
@@ -14,7 +14,7 @@ class HybridDecoder(tf.keras.Layer):
         self.use_attention = use_attention
 
         self.word_lut = tf.keras.layers.Embedding(target_vocab_size, hidden_state_size)
-        self.rnn = StackedLSTM(num_layers, self.input_size, dropout)
+        self.rnn = StackedLSTM(num_layers, hidden_state_size, dropout)
         self.dropout = tf.keras.layers.Dropout(dropout)
 
         if self.use_attention:
@@ -23,10 +23,19 @@ class HybridDecoder(tf.keras.Layer):
             self.attention = tf.keras.layers.Dense(self.inputs_size, use_bias=False)
 
     def step(self, embedding, output, tree_hidden, tree_context, text_hidden, text_context):
-        embedding = tf.concat([embedding, output], axis=-1)
+        print('asd')
+        print(embedding.shape)
+        print(output.shape)
+        print('asd')
+
+        embedding = tf.concat([embedding, output], axis=1)
 
         tree_output, tree_hidden = self.rnn(embedding, tree_hidden)
         text_output, text_hidden = self.rnn(embedding, text_hidden)
+
+        print(tree_output.shape)
+        print(text_output.shape) 
+        print('qwe')
 
         if self.use_attention:
             output, tree_attention, text_attention = self.attention(tree_output, tree_context, text_output, text_context)
@@ -41,9 +50,11 @@ class HybridDecoder(tf.keras.Layer):
         embedding, output, tree_hidden, tree_context, text_hidden, text_context = state
 
         embeddings = self.word_lut(inputs)
+        embeddings = tf.reshape(embeddings, (embeddings.shape[1], embeddings.shape[0], embeddings.shape[2]))
+        
         outputs = []
 
-        for i in range(inputs.shape[0]):
+        for i in range(inputs.shape[1]):
             output, tree_hidden, text_hidden = self.step(embedding, output, tree_hidden, tree_context, text_hidden, text_context)
             outputs.append(output)
             embedding = embeddings[i]

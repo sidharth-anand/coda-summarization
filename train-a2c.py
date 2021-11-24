@@ -1,25 +1,24 @@
-from __future__ import division
-import argparse
-from constants.constants import UNK_WORD
-from data.Tree import Tree, json2tree_binary
-from loss.Loss import weighted_mse
-from model.CodeEncoder import CodeEncoder
-from model.HybridDecoder import HybridDecoder
-from model.TextEncoder import TextEncoder
-from model.Hybrid2Seq import Hybrid2Seq
-from model.Generator import Generator
-from train.ReinforceTrainer import ReinforceTrainer
-from train.Trainer import Trainer
-import os
-import sys
-import datetime
-import numpy as np
-import os.path
-import random
 import time
 import pickle
+
+import argparse
+import numpy as np
 import tensorflow as tf
 
+from constants.constants import UNK_WORD 
+
+from data.DataGenerator import DataGenerator
+from data.Tree import Tree, json2tree_binary
+
+from loss.Loss import weighted_mse
+
+from model.Hybrid2Seq import Hybrid2Seq
+from model.Generator import Generator
+
+from train.ReinforceTrainer import ReinforceTrainer
+from train.Trainer import Trainer
+
+from reward.Reward import corpus_bleu, sentence_bleu
 
 def get_opt():
     parser = argparse.ArgumentParser(description='a2c-train.py')
@@ -98,9 +97,11 @@ def get_opt():
 def get_data_trees(trees):
     data_trees = []
     for t_json in trees:
-        for k, node in t_json.iteritems():
+        for k, node in t_json.items():
             if node['parent'] == None:
                 root_idx = k
+                break
+
         tree = json2tree_binary(t_json, Tree(), root_idx)
         data_trees.append(tree)
 
@@ -112,7 +113,7 @@ def get_data_leafs(trees, srcDicts):
     for tree in trees:
         leaf_contents = tree.leaf_contents()
 
-        leafs.append(srcDicts.convertToIdx(leaf_contents, UNK_WORD))
+        leafs.append(srcDicts.convert_to_index(leaf_contents, UNK_WORD))
     return np.array(leafs)
 
 
@@ -147,15 +148,14 @@ def load_data(filename, batch_size):
     dataset["test"]['leafs'] = get_data_leafs(
         dataset["test"]['trees'], dicts['src'])
 
-    supervised_data_gen = Generator(dataset["train_xe"], batch_size)
-    rl_data_gen = Generator(dataset["train_pg"], batch_size)
-    valid_data_gen = Generator(dataset["valid"], batch_size)
-    test_data_gen = Generator(dataset["test"], batch_size)
-    # batch_size set to 1 for case study
-    vis_data_gen = Generator(dataset["test"], 1)
+    supervised_data_gen = DataGenerator(dataset["train_xe"], batch_size)
+    rl_data_gen = DataGenerator(dataset["train_pg"], batch_size)
+    valid_data_gen = DataGenerator(dataset["valid"], batch_size)
+    test_data_gen = DataGenerator(dataset["test"], batch_size)
+    vis_data_gen = DataGenerator(dataset["test"], 1)
 
     print(" * vocabulary size. source = %d; target = %d" %
-          (dicts["src"].size(), dicts["tgt"].size()))
+          (dicts["src"].size, dicts["tgt"].size))
     print(" * number of XENT training sentences. %d" %
           len(dataset["train_xe"]["src"]))
     print(" * number of PG training sentences. %d" %
@@ -171,19 +171,11 @@ def init(model):
 
 
 def create_optim(model):
-    optim = lib.Optim(
-        model.parameters(), opt.optim, opt.lr, opt.max_grad_norm,
-        lr_decay=opt.learning_rate_decay, start_decay_at=opt.start_decay_at
-    )
-    return optim
-
+    raise Exception('Dont call this motherfucker')
 
 def create_model(dicts):
-
-    model = Hybrid2Seq(dicts, dicts['src'].size(), dicts['tgt'].size())
-
+    model = Hybrid2Seq(dicts['src'], dicts['src'].size, dicts['tgt'].size)
     return model
-
 
 def main():
     print("Start...")
@@ -198,48 +190,46 @@ def main():
     use_critic = opt.start_reinforce is not None
     print("use_critic: ", use_critic)
 
-    model = create_model(Hybrid2Seq, dicts, dicts["tgt"].size())
+    model = create_model(dicts)
 
     # Metrics.
     metrics = {}
-    metrics["xent_loss"] = tf.nn.weighted_cross_entropy_with_logits
+    metrics["cross_entropy_loss"] = tf.nn.weighted_cross_entropy_with_logits
     metrics["critic_loss"] = weighted_mse
-    metrics["sent_reward"] = lib.Reward.sentence_bleu
-    metrics["corp_reward"] = lib.Reward.corpus_bleu
-    if opt.pert_func is not None:
-        opt.pert_func = lib.PertFunction(opt.pert_func, opt.pert_param)
+    metrics["sentence_reward"] = sentence_bleu
+    metrics["corpus_reward"] = corpus_bleu
+    #if opt.pert_func is not None:
+    #    opt.pert_func = lib.PertFunction(opt.pert_func, opt.pert_param)
 
     print("opt.eval: ", opt.eval)
     print("opt.eval_sample: ", opt.eval_sample)
 
-    optim = tf.keras.optimizers.Adam
-    xent_trainer = Trainer(model, supervised_data_gen,
+    optim = tf.keras.optimizers.Adam()
+    print(optim)
+    cross_entropy_trainer = Trainer(model, supervised_data_gen,
                            valid_data_gen, metrics, dicts, optim)
 
     start_time = time.time()
-    # Supervised training.
+
     print("supervised training..")
     print("start_epoch: ", opt.start_epoch)
 
-    xent_trainer.train(opt.start_epoch, opt.start_reinforce - 1, start_time)
-    # # Create critic here to not affect random seed.
+    cross_entropy_trainer.train(opt.start_epoch, opt.start_reinforce - 1)
+
     critic = create_model(dicts)
-    # Pretrain critic.
     print("pretrain critic...")
+
     if opt.critic_pretrain_epochs > 0:
         reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics,
                                              dicts, optim, optim, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
         reinforce_trainer.train(
             opt.start_reinforce, opt.start_reinforce + opt.critic_pretrain_epochs - 1, True)
-    # Reinforce training.
+
     print("reinforce training...")
     reinforce_trainer = ReinforceTrainer(
         model, critic, rl_data_gen, test_data_gen, metrics, dicts, optim, optim, opt)
     reinforce_trainer.train(opt.start_reinforce +
                             opt.critic_pretrain_epochs, opt.end_epoch, False)
-
-    # Supervised training only.
-
 
 if __name__ == '__main__':
     main()

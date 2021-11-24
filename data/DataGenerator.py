@@ -1,14 +1,15 @@
 from typing import List
+
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.eager.execute import make_tensor
 
 from constants.constants import PAD
 
-class Generator(tf.keras.utils.Sequence):
+class DataGenerator(tf.compat.v1.keras.utils.Sequence):
     'Generates data for Keras'
     def __init__(self, data, batch_size=64,shuffle=True):
         'Initialization'
+
         self.data = data
         self.batch_size = batch_size
         
@@ -22,10 +23,12 @@ class Generator(tf.keras.utils.Sequence):
     def __batchify__(self,data: List[List[int]], include_lengths = False):
         lengths = [len(x) for x in data]
         max_length = np.amax(lengths)
+
         for sentence in data:
             length = len(sentence)
             for _ in range(max_length - length):
-                sentence += PAD
+                sentence.append(PAD)
+        
         if include_lengths:
             return data, lengths
         else:
@@ -34,9 +37,7 @@ class Generator(tf.keras.utils.Sequence):
     def __getitem__(self, index):
         'Generate one batch of data'
         # Generate indexes of the batch
-        indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
-
-
+        indexes = self.indexes[index * self.batch_size : (index + 1) * self.batch_size]
 
         # Find list of IDs
         batch_src = [self.data['src'][k] for k in indexes]
@@ -47,16 +48,22 @@ class Generator(tf.keras.utils.Sequence):
         batch_src, src_lengths = self.__batchify__(batch_src, include_lengths=True)
         batch_leafs, leaf_lengths = self.__batchify__(batch_leafs,include_lengths=True)
         batch_tgt = self.__batchify__(batch_tgt)
-        #batch_trees = batch_trees
-
 
         tree_lengths = []
         for tree in batch_trees:
             tree_lengths.append(tree.leaf_count())
+        
+        return (
+                    (
+                        (self.make_tensor(batch_src), src_lengths),\
+                        (batch_trees,tree_lengths, (self.make_tensor(batch_leafs),leaf_lengths)),\
+                        self.make_tensor(batch_tgt),\
+                        range(len(batch_src))
+                    ),
+               )
+               
 
-        return (make_tensor(batch_src),src_lengths), (batch_trees,tree_lengths, (make_tensor(batch_leafs),leaf_lengths)) , make_tensor(batch_tgt), range(len(batch_src))
-
-    def make_tensor(data):
+    def make_tensor(self, data):
         return tf.convert_to_tensor(data)
 
     def on_epoch_end(self):

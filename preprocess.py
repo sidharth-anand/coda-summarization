@@ -2,66 +2,59 @@ import argparse
 import codecs
 import pickle
 import numpy as np
+import typing
 
 from data.Tree import python2tree, python_tokenize, traverse_python_tree, split_tree, merge_tree, init_vocabulary
 
 from constants.constants import UNK_WORD, EOS_WORD
 
-#TODO: Clean up global options cancer
-#TODO: Add typing
-#TODO: Separate from run.py
-#TODO: Clean up arguments
-#TODO: Remove commented code
-#TODO: Improve AST saving/loading
-
 def get_opt():
-    parser = argparse.ArgumentParser(description='preprocess.py')
+    
+    parser = argparse.ArgumentParser(description='preprocess.py')                        
 
-    parser.add_argument('--data-name', help="Data name")
-    parser.add_argument("-train_src", required=True,
-                        help="Path to the training source data")
-    parser.add_argument("-train_tgt", required=True,
-                        help="Path to the training target data")
-    parser.add_argument("-train_xe_src", required=True,
-                        help="Path to the pre-training source data")
-    parser.add_argument("-train_xe_tgt", required=True,
-                        help="Path to the pre-training target data")
-    parser.add_argument("-train_pg_src", required=False,
-                        help="Path to the bandit training source data")
-    parser.add_argument("-train_pg_tgt", required=False,
+    parser.add_argument('--data-name', help="Data name", default='github-python')
+    parser.add_argument("--train-src", 
+                        help="Path to the training source data", default="dataset/processed/train_0.60.20.2.code")
+    parser.add_argument("--train-tgt", 
+                        help="Path to the training target data", default="dataset/processed/train_0.60.20.2.comment")
+    parser.add_argument("--train-xe-src", 
+                        help="Path to the pre-training source data", default="dataset/processed/train_0.60.20.2.code")
+    parser.add_argument("--train-xe-tgt", 
+                        help="Path to the pre-training target data", default="dataset/processed/train_0.60.20.2.comment")
+    parser.add_argument("--train-pg-src",
+                        help="Path to the bandit training source data", default="dataset/processed/train_0.60.20.2.code")
+    parser.add_argument("--train-pg-tgt", default='dataset/processed/train_0.60.20.2.comment',
                         help="Path to the bandit training target data")
-    parser.add_argument("-valid_src", required=True,
+    parser.add_argument("--valid-src",  default='dataset/processed/validation_0.60.20.2.code',
                         help="Path to the validation source data")
-    parser.add_argument("-valid_tgt", required=True,
+    parser.add_argument("--valid-tgt",  default='dataset/processed/validation_0.60.20.2.comment',
                         help="Path to the validation target data")
-    parser.add_argument("-test_src", required=True,
+    parser.add_argument("--test-src",  default='dataset/processed/test_0.60.20.2.code',
                         help="Path to the test source data")
-    parser.add_argument("-test_tgt", required=True,
+    parser.add_argument("--test-tgt",  default='dataset/processed/test_0.60.20.2.comment',
                         help="Path to the test target data")
-    parser.add_argument('-save_data', required=True,
+    parser.add_argument('--save-data',  default='dataset/processed/processed_all ',
                         help="Output file for the prepared data")
-    parser.add_argument('-src_vocab_size', type=int,
+    parser.add_argument('--src-vocab-size', type=int,
                         default=50000, help="Size of the source vocabulary")
-    parser.add_argument('-tgt_vocab_size', type=int,
+    parser.add_argument('--tgt-vocab-size', type=int,
                         default=50000, help="Size of the target vocabulary")
-    parser.add_argument('-src_seq_length', type=int,
+    parser.add_argument('--src-seq-length', type=int,
                         default=150, help="Maximum source sequence length")
-    parser.add_argument('-tgt_seq_length', type=int, default=50,
+    parser.add_argument('--tgt-seq-length', type=int, default=50,
                         help="Maximum target sequence length to keep.")
 
-    # parser.add_argument('-shuffle',    type=int, default=1,
-    #                     help="Shuffle data")
     parser.add_argument('-seed',       type=int,
                         default=3435, help="Random seed")
     parser.add_argument('-lower', action='store_true', help='lowercase data')
-    parser.add_argument('-report_every', type=int, default=1000,
+    parser.add_argument('-report-every', type=int, default=1000,
                         help="Report status every this many sentences")
 
     opt = parser.parse_args()
     return opt
 
 
-def make_data(which, source_file_path, target_file_path, source_dictionaries, target_dictonaries):
+def make_data(source_file_path: str, target_file_path: str, source_dictionaries: typing.Dict, target_dictonaries: typing.Dict):
     src, tgt, trees = [], [], []
     code_sentences, comment_sentences = [], []
     sizes = []
@@ -93,16 +86,15 @@ def make_data(which, source_file_path, target_file_path, source_dictionaries, ta
         else:
             srcLine = sline.split()
             tgtLine = tline.split()
-
-        # len(srcLine) <= opt.src_seq_length and
+        
         if len(srcLine) <= opt.src_seq_length and len(tgtLine) <= opt.tgt_seq_length:
             try:
                 atok, tree = python2tree(sline)
                 tree_json = traverse_python_tree(atok,tree)
-                # trees += [{
-                #     'atok': atok,
-                #     'tree': tree
-                # }]
+                
+                tree_json = split_tree(tree_json, len(tree_json))
+                tree_json = merge_tree(tree_json)
+
                 trees += [tree_json]
 
                 src += [source_dictionaries.convert_to_index(srcLine, UNK_WORD)]
@@ -120,15 +112,6 @@ def make_data(which, source_file_path, target_file_path, source_dictionaries, ta
     source_flie.close()
     target_file.close()
 
-    # print('... sorting sentences by size')
-    # _, perm = torch.sort(torch.Tensor(sizes))
-    # src = [src[idx] for idx in perm]
-    # tgt = [tgt[idx] for idx in perm]
-    # trees = [trees[idx] for idx in perm]
-
-    # src = np.array(src)
-    # tgt = np.array(tgt)
-    # trees = np.array(trees)
 
     print(('Prepared %d sentences ' +
           '(%d ignored due to length == 0 or src len > %d or tgt len > %d)') %
@@ -139,11 +122,11 @@ def make_data(which, source_file_path, target_file_path, source_dictionaries, ta
     return src, tgt, trees, code_sentences, comment_sentences
 
 
-def makeDataGeneral(which, src_path, tgt_path, dicts):
-    print('Preparing ' + which + '...')
+def makeDataGeneral(params: str, src_path: str, tgt_path: str, dicts: typing.Dict):
+    print('Preparing ' + params + '...')
     res = {}
     res['src'], res['tgt'], res['trees'], code_sentences, comment_sentences = make_data(
-        which, src_path, tgt_path, dicts['src'], dicts['tgt'])
+        src_path, tgt_path, dicts['src'], dicts['tgt'])
     return res, code_sentences, comment_sentences
 
 
@@ -157,7 +140,6 @@ def main():
 
     print("code vocab size",dicts['src'].size)
     print("comment vocab size",dicts['tgt'].size)
-    # print(opt.save_data)
 
     dicts['src'].write_to_file(opt.save_data + '.code.dict')
     dicts['tgt'].write_to_file(opt.save_data + '.comment.dict')
@@ -178,6 +160,7 @@ def main():
 
     with open(save_file_path, 'wb') as save_file:
         pickle.dump(save_data, save_file, protocol=pickle.HIGHEST_PROTOCOL)
+
 
 if __name__ == "__main__":
     global opt

@@ -5,7 +5,7 @@ from model.Hybrid2Seq import Hybrid2Seq
 from constants.constants import PAD
 
 class Evaluator:
-    def __init__(self, model: Hybrid2Seq, metrics, dictionaries, max_length: int):
+    def __init__(self, model: Hybrid2Seq, metrics, dictionaries, max_length: int = 50):
         self.model = model
         self.dictionaries = dictionaries
 

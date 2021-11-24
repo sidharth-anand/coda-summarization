@@ -95,6 +95,7 @@ class ReinforceTrainer:
             with tf.GradientTape() as actor_tape:
                 with tf.GradientTape() as critic_tape:
                     batch = self.training_data[i]
+                    batch = batch[0]
 
                     targets = batch[2]
                     code_attention_mask = tf.math.equal(batch[1][2][0], tf.constant(PAD))
@@ -142,8 +143,6 @@ class ReinforceTrainer:
                     else:
                         actor_loss = 0
 
-                    
-            
             total_reward += total_reward
             reported_reward += rewards
 
