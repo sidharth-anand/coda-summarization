@@ -22,10 +22,10 @@ class HybridDecoder(tf.keras.layers.Layer):
         else:
             self.attention = tf.keras.layers.Dense(self.inputs_size, use_bias=False)
 
-    def step(self, embedding, output, tree_hidden, tree_context, text_hidden, text_context):
+    def step(self, embedding, output, tree_hidden: tuple, tree_context, text_hidden: tuple, text_context):
         print('asd')
-        print(embedding.shape)
-        print(output.shape)
+        print('HD step() embedding shape ' , embedding.shape)
+        print('HD step() output shape ' , output.shape)
         print('asd')
 
         embedding = tf.concat([embedding, output], axis=1)
@@ -33,8 +33,10 @@ class HybridDecoder(tf.keras.layers.Layer):
         tree_output, tree_hidden = self.rnn(embedding, tree_hidden)
         text_output, text_hidden = self.rnn(embedding, text_hidden)
 
-        print(tree_output.shape)
-        print(text_output.shape) 
+        print('HD step() tree o/p shape ' , tree_output.shape)
+        print('HD step() text o/p shape ' , text_output.shape) 
+        print('HD step() tree hidden shape ' , len(tree_hidden))
+        print('HD step() text hidden shape ' , len(text_hidden)) 
         print('qwe')
 
         if self.use_attention:
@@ -43,6 +45,7 @@ class HybridDecoder(tf.keras.layers.Layer):
             output = self.attention(tf.concat([tree_output, text_output], axis=-1))
         
         output = self.dropout(output)
+        print('HD step() O/P shape ' ,  output.shape)
 
         return output, tree_hidden, text_hidden
 

@@ -26,12 +26,16 @@ class BinaryTreeComposer(tf.keras.layers.Layer):
         rf = tf.keras.activations.sigmoid(tf.math.add(self.rflh(lh), self.rfrh(rh)))
         update = tf.math.tanh(tf.math.add(self.ulh(lh), self.urh(rh)))
         
+        #Tensor of (1, hidden_state_size)
         current = tf.math.add(tf.math.multiply(i, update), tf.math.multiply(lf, lc), tf.math.multiply(rf, rc))
+        
 
         if self.gate_output:
             output = tf.keras.activations.sigmoid(tf.math.add(self.olh(lh), self.orh(rh)))
+            #Tensor of (1, hidden_state_size)
             hidden = tf.math.multiply(output, tf.math.tanh(current))
         else:
+            #Tensor of (1, hidden_state_size)
             hidden = tf.math.tanh(current)
         
         return current, hidden

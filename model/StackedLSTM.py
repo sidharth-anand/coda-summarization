@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+#Yenugu kill youself you mother bitch fucking
 class StackedLSTM(tf.keras.layers.Layer):
     def __init__(self, num_layers: int, rnn_size: int, dropout: float) -> None:
         super(StackedLSTM, self).__init__()
@@ -10,8 +10,8 @@ class StackedLSTM(tf.keras.layers.Layer):
         self.layers = [tf.keras.layers.LSTMCell(rnn_size) for _ in range(num_layers)]
 
     def call(self, inputs, hidden):
-        print(inputs.shape)
-        print(hidden[0].shape, hidden[1].shape)
+        print("LSTM call() inputs: " , inputs.shape)
+        print("Hidden params: " , hidden[0].shape, hidden[1].shape)
 
         h0, c0 = hidden
 
@@ -27,10 +27,10 @@ class StackedLSTM(tf.keras.layers.Layer):
             _, state = layer(inputs, states=(h0[i], c0[i]))
             h1i, c1i = state[0], state[1]
 
-            print(h1i)
-            print(c1i)
-            print(h1i.shape)
-            print(c1i.shape)
+            print("H1i: " , h1i)
+            print("C1i: " , c1i)
+            print("H1i.shape: " , h1i.shape)
+            print("C1i.shape: " , c1i.shape)
             inputs = h1i
 
             if not i == self.num_layers:

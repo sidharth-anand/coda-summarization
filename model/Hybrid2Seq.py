@@ -68,8 +68,8 @@ class Hybrid2Seq(tf.keras.Model):
 
         if training:
             logits = self.generator(outputs)
-            print(logits.shape)
-            print(targets.shape)
+            print('logists shape',logits.shape)
+            print('target shape',targets.shape)
             return tf.reshape(logits, targets.shape)
         
         return outputs

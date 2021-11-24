@@ -11,6 +11,8 @@ class Generator(tf.keras.Model):
 
     #TODO: this shit is wrong as well
     def call(self, inputs):
+        x = tf.reshape(inputs, [-1, inputs.shape[-1]])
+        print(x.shape)
         return self.linear(tf.reshape(inputs, [-1, inputs.shape[-1]]))
 
     #TODO: is this shit really correct?
