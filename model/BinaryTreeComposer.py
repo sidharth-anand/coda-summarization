@@ -15,12 +15,12 @@ class BinaryTreeComposer(tf.keras.layers.Layer):
         if gate_output:
             self.olh, self.orh = self.create_gate(hidden_state_size)
 
-    def create_gate(self, size: int):
+    def create_gate(self, size: int) -> tuple:
         lh = tf.keras.layers.Dense(size, use_bias=True)
         rh = tf.keras.layers.Dense(size, use_bias=True)
         return lh, rh
 
-    def call(self, lc, lh, rc, rh):
+    def call(self, lc: tf.Tensor, lh: tf.Tensor, rc: tf.Tensor, rh: tf.Tensor) -> tuple:
         i = tf.keras.activations.sigmoid(tf.math.add(self.ilh(lh), self.irh(rh)))
         lf = tf.keras.activations.sigmoid(tf.math.add(self.lflh(lh), self.lfrh(rh)))
         rf = tf.keras.activations.sigmoid(tf.math.add(self.rflh(lh), self.rfrh(rh)))
