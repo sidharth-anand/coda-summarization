@@ -148,11 +148,11 @@ def load_data(filename, batch_size):
     dataset["test"]['leafs'] = get_data_leafs(
         dataset["test"]['trees'], dicts['src'])
 
-    supervised_data_gen = DataGenerator(dataset["train_xe"], batch_size)
-    rl_data_gen = DataGenerator(dataset["train_pg"], batch_size)
-    valid_data_gen = DataGenerator(dataset["valid"], batch_size)
-    test_data_gen = DataGenerator(dataset["test"], batch_size)
-    vis_data_gen = DataGenerator(dataset["test"], 1)
+    supervised_data_gen = DataGenerator(dataset["train_xe"], dicts['tgt'].size,batch_size=batch_size, shuffle=True)
+    rl_data_gen = DataGenerator(dataset["train_pg"], dicts['tgt'].size,batch_size=batch_size)
+    valid_data_gen = DataGenerator(dataset["valid"], dicts['tgt'].size,batch_size=batch_size)
+    test_data_gen = DataGenerator(dataset["test"], dicts['tgt'].size,batch_size=batch_size)
+    vis_data_gen = DataGenerator(dataset["test"],dicts['tgt'].size, 1)
 
     print(" * vocabulary size. source = %d; target = %d" %
           (dicts["src"].size, dicts["tgt"].size))
@@ -186,6 +186,7 @@ def main():
         opt.data, opt.batch_size)
 
     print("Building model...")
+    
 
     use_critic = opt.start_reinforce is not None
     print("use_critic: ", use_critic)

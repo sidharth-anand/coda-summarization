@@ -10,16 +10,11 @@ class StackedLSTM(tf.keras.layers.Layer):
         self.layers = [tf.keras.layers.LSTMCell(rnn_size) for _ in range(num_layers)]
 
     def call(self, inputs, hidden):
-        print("LSTM call() inputs: " , inputs.shape)
-        print("Hidden params: " , hidden[0].shape, hidden[1].shape)
+        # inputs - (batch_size, concat(word_emeddings, hidden_input_size))
+        # hidden params [0] - (batch_size, 1, word_embeddings)
 
         h0, c0 = hidden
 
-        print('h0',type(h0))
-        print('c0',type(c0))
-        
-        print(h0.shape)
-        print(c0.shape)
 
         h1, c1 = [], []
 
@@ -27,10 +22,7 @@ class StackedLSTM(tf.keras.layers.Layer):
             _, state = layer(inputs, states=(h0[i], c0[i]))
             h1i, c1i = state[0], state[1]
 
-            print("H1i: " , h1i)
-            print("C1i: " , c1i)
-            print("H1i.shape: " , h1i.shape)
-            print("C1i.shape: " , c1i.shape)
+            #h1i - (batch_size, word_embeddings)
             inputs = h1i
 
             if not i == self.num_layers:
@@ -41,7 +33,5 @@ class StackedLSTM(tf.keras.layers.Layer):
         
         h1 = tf.stack(h1)
         c1 = tf.stack(c1)
-
-        print('shit over')
 
         return inputs, (h1, c1)

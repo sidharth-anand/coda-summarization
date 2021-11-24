@@ -1,1 +1,1 @@
-```python run.py train_a2c 10 30 10 hybrid 0```
+`python run.py train 10 30 10 hybrid 0`
