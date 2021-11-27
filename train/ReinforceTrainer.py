@@ -1,5 +1,6 @@
 import math
 import time
+import numpy as np
 
 import tensorflow as tf
 
@@ -110,17 +111,18 @@ class ReinforceTrainer:
 
                 #TODO: add reward shaping here
 
-                print(one_hot_target.shape, 'asdasdasdasd')
+                
+                
+                
                 samples = tf.Variable(tf.convert_to_tensor(samples), trainable=True, name='actor:samples')
-                rewards = tf.Variable(tf.stack([rewards] * one_hot_target.shape[1], axis=1), trainable=True, name='actor:rewards')
+                # targets and samples have different sequence length
+                rewards = tf.Variable(tf.stack([rewards] * one_hot_target.shape[2], axis=1), trainable=True, name='actor:rewards')
 
-                critic_tape.watch(samples)
-                critic_tape.watch(rewards)
+                
+                
+                print('rewards', rewards.shape)
 
-                print('samples shape', samples.shape)
-                print(samples.dtype)
-                print('rewards shape', rewards.shape)
-                print(self.actor.trainable_variables)
+                
 
                 critic_loss_weights = tf.cast(tf.math.not_equal(samples, tf.constant(PAD)), dtype=tf.float32)
                 num_words = tf.reduce_sum(critic_loss_weights)
@@ -129,12 +131,19 @@ class ReinforceTrainer:
 
                 if not no_update:
                     baselines = self.critic((batch[0], batch[1], samples, batch[3], batch[4]), regression=True)
-                    print('baselines', baselines.shape)
+                    rewards = tf.expand_dims(rewards, axis=-1)
+                    rewards = tf.broadcast_to(rewards, [rewards.shape[0], rewards.shape[1], baselines.shape[1]])
+                    rewards = tf.reshape(rewards, [rewards.shape[0], rewards.shape[2], rewards.shape[1]])
+                    
+                    mask = np.zeros(rewards.shape, dtype=np.float32)
+                    mask[:, rewards.shape[1] - 1, :] = 1
+                    rewards = rewards * mask
+                    
+                    
+                    
 
                     critic_loss = weighted_mse(baselines, rewards, critic_loss_weights)
-                    print(baselines)
-                    print(critic_loss.shape)
-                    print([var.name for var in critic_tape.watched_variables()])
+                   
                     grads = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
                     self.critic.optimizer.apply_gradients(zip(grads, self.critic.trainable_variables))
 
@@ -145,11 +154,11 @@ class ReinforceTrainer:
                 if not pretrain_critic and not no_update:
                     normalized_rewards = tf.Variable(rewards - baselines, trainable=True)
                     actor_loss_weights = tf.cast(tf.math.multiply(normalized_rewards, critic_loss_weights), dtype=tf.float32)
-                    print(actor_loss_weights)
+                    
 
                     actor_loss = tf.nn.weighted_cross_entropy_with_logits(logits=tf.cast(self.actor.predict(outputs), dtype=tf.float32), labels=tf.cast(samples, dtype=tf.float32), pos_weight=actor_loss_weights)
                     grads = actor_tape.gradient(actor_loss, self.actor.trainable_variables)
-                    print(grads)
+                    
                     self.actor.optimizer.apply_gradients(zip(grads, self.actor.trainable_variables))
                     
                     self.actor_optimizer.step()

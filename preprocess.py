@@ -142,8 +142,8 @@ def main():
     dicts['tgt'] = init_vocabulary(
         opt, 'comment', opt.train_tgt, opt.tgt_vocab_size)
 
-    print("code vocab size", dicts['src'].size)
-    print("comment vocab size", dicts['tgt'].size)
+    # print("code vocab size", dicts['src'].size)
+    # print("comment vocab size", dicts['tgt'].size)
 
     dicts['src'].write_to_file(opt.save_data + '.code.dict')
     dicts['tgt'].write_to_file(opt.save_data + '.comment.dict')

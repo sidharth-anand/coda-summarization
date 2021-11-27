@@ -77,8 +77,7 @@ class Hybrid2Seq(tf.keras.Model):
         targets, one_hot_target, initial_states = self.initialize(batch)
         outputs = self.hybrid_decoder(targets, initial_states)
 
-        print('hybrid2seq call')
-        print(outputs.shape)
+        
 
         if regression:
             if not predict:
@@ -138,8 +137,7 @@ class Hybrid2Seq(tf.keras.Model):
             sample = tf.squeeze(tf.random.categorical(logits=distribution, num_samples=1))
             samples.append(sample)
 
-            print(output.shape)
-            print(sample.shape)
+            
 
             reached_eos |= (sample == EOS)
             if tf.reduce_sum(tf.cast(reached_eos, dtype=tf.int32)) == batch_size:

@@ -20,7 +20,7 @@ class Generator(tf.keras.Model):
         for i in range(inputs.shape[1]):
             current_word = inputs[:, i, :] # [B, 1, H]
             current_word = tf.squeeze(current_word) # [B, H]
-            print('current word', current_word.shape) 
+            
             outputs.append(self.linear(current_word)) # [B, T]
 
         return tf.stack(outputs, axis=1) # [B, L, T]

@@ -216,7 +216,7 @@ def main():
     #cross_entropy_trainer.train(opt.start_epoch, opt.start_reinforce - 1)
 
     critic = create_model(dicts)
-    print('qweqweqwe', critic.trainable_variables)
+    
     print("pretrain critic...")
 
     if opt.critic_pretrain_epochs > 0:

@@ -54,7 +54,7 @@ class Trainer:
         last_reported_time = time.time()
 
         print('started train epoch')
-        print(len(self.train_data_gen))
+        
 
         for i in range(len(self.train_data_gen)):
             with tf.GradientTape() as tape:

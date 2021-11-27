@@ -22,13 +22,10 @@ class HybridAttention(tf.keras.layers.Layer):
         self.text_mask = text_mask
 
     def call(self, tree_inputs: tf.Tensor, tree_context: tf.Tensor, text_inputs: tf.Tensor, text_context: tf.Tensor) -> tuple:
-        print('hybrid attention')
+        
 
         # Tensors of shape (Batch size, )
-        print("Tree input shape - 1 ",  tree_inputs.shape)
-        print("Text input shape - 1 ",  text_inputs.shape)
-        print("Tree context shape - 1 ",  tree_context.shape)
-        print("Text context shape - 1 ",  text_context.shape)
+        
 
         tree_context = tf.reshape(tree_context, [
                                   tree_context.shape[1], tree_context.shape[0], tree_context.shape[2]])
@@ -38,18 +35,14 @@ class HybridAttention(tf.keras.layers.Layer):
         tree_target = tf.expand_dims(self.linear_in(tree_inputs), axis=2)
         text_target = tf.expand_dims(self.linear_in(text_inputs), axis=2)
 
-        print("Tree target shape - 1 ",  tree_target.shape)
-        print("Text target shape - 1 ",  text_target.shape)
-        print("Tree context shape - 1 ",  tree_context.shape)
-        print("Text context shape - 1 ",  text_context.shape)
+        
 
         tree_attention = tf.squeeze(
             tf.matmul(tree_context, tree_target), axis=2)
         text_attention = tf.squeeze(
             tf.matmul(text_context, text_target), axis=2)
 
-        print("Tree attention shape ",  tree_attention.shape)
-        print("Text attention shape ",  text_attention.shape)
+        
 
         if self.tree_mask is not None and self.text_mask is not None:
             tree_attention = tf.math.multiply(tree_attention, self.tree_mask)
@@ -63,8 +56,8 @@ class HybridAttention(tf.keras.layers.Layer):
         text_attention_3d = tf.reshape(
             text_attention, (text_attention.shape[0], 1, text_attention.shape[1]))
 
-        print("Tree attention 3D shape ", tree_attention_3d.shape)
-        print("Text attention 3D shape ", text_attention_3d.shape)
+        # print("Tree attention 3D shape ", tree_attention_3d.shape)
+        # print("Text attention 3D shape ", text_attention_3d.shape)
 
         tree_weighted_context = tf.squeeze(
             tf.matmul(tree_attention_3d, tree_context), axis=1)
@@ -80,8 +73,6 @@ class HybridAttention(tf.keras.layers.Layer):
             [tree_combined_context, text_combined_context], axis=1)
         combined_context = self.tanh(self.linear_out(combined_context))
 
-        print("Tree weighted context shape ", tree_weighted_context.shape)
-        print("Text weighted context shape ", text_weighted_context.shape)
-        print("Combined context shape ", combined_context.shape)
+        
 
         return combined_context, tree_attention, text_attention
