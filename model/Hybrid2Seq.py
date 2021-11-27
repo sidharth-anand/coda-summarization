@@ -83,7 +83,7 @@ class Hybrid2Seq(tf.keras.Model):
         if regression:
             if not predict:
                 logits = self.generator(outputs)
-                return tf.reshape(logits, one_hot_target.shape)
+                return logits
             else:
                 return self.predict(outputs)
 

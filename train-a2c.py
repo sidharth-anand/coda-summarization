@@ -30,7 +30,7 @@ def get_opt():
 
     # Optimization options
     parser.add_argument('-batch_size', type=int,
-                        default=64, help='Maximum batch size')
+                        default=2, help='Maximum batch size')
 
     parser.add_argument("-end_epoch", type=int, default=50,
                         help="Epoch to stop training.")

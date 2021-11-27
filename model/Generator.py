@@ -13,15 +13,17 @@ class Generator(tf.keras.Model):
             target_vocabulary_size, use_bias=True)
 
     # TODO: this shit is wrong as well - nope
+    #inputs = [B, L, H]
     def call(self, inputs):
         outputs = []
 
         for i in range(inputs.shape[1]):
-            current_word = inputs[:, i, :]
-            current_word = tf.squeeze(current_word)
-            outputs.append(self.linear(current_word))
+            current_word = inputs[:, i, :] # [B, 1, H]
+            current_word = tf.squeeze(current_word) # [B, H]
+            print('current word', current_word.shape) 
+            outputs.append(self.linear(current_word)) # [B, T]
 
-        return tf.stack(outputs, axis=1)
+        return tf.stack(outputs, axis=1) # [B, L, T]
 
     #input: (B, H)
     def translate(self, inputs):

@@ -74,8 +74,8 @@ class ReinforceTrainer:
             #TODO: Checkpoint the model here
         
     def train_epoch(self, epoch_index: int, pretrain_critic: bool, no_update: bool, start_time):
-        total_reward = 0
-        reported_reward = 0
+        total_rewards = 0
+        reported_rewards = 0
 
         total_critic_loss = 0
         reported_critic_loss = 0
@@ -94,6 +94,8 @@ class ReinforceTrainer:
                 batch = batch[0]
 
                 targets = batch[2]
+                one_hot_target = batch[4]
+                
                 code_attention_mask = tf.cast(tf.math.equal(batch[1][2][0], tf.constant(PAD)), dtype=tf.float32)
                 text_attention_mask = tf.cast(tf.math.equal(batch[0][0], tf.constant(PAD)), dtype=tf.float32)
 
@@ -108,8 +110,9 @@ class ReinforceTrainer:
 
                 #TODO: add reward shaping here
 
-                samples = tf.Variable(tf.convert_to_tensor(samples, dtype=tf.float32), trainable=True, name='actor:samples')
-                rewards = tf.Variable(tf.stack([rewards] * samples.shape[1], axis=1), trainable=True, name='actor:rewards')
+                print(one_hot_target.shape, 'asdasdasdasd')
+                samples = tf.Variable(tf.convert_to_tensor(samples), trainable=True, name='actor:samples')
+                rewards = tf.Variable(tf.stack([rewards] * one_hot_target.shape[1], axis=1), trainable=True, name='actor:rewards')
 
                 critic_tape.watch(samples)
                 critic_tape.watch(rewards)
@@ -119,18 +122,23 @@ class ReinforceTrainer:
                 print('rewards shape', rewards.shape)
                 print(self.actor.trainable_variables)
 
-                #critic_loss_weights = tf.cast(tf.math.not_equal(samples, tf.constant(PAD, dtype=tf.float32)), dtype=tf.float32)
-                #num_words = tf.reduce_sum(critic_loss_weights)
+                critic_loss_weights = tf.cast(tf.math.not_equal(samples, tf.constant(PAD)), dtype=tf.float32)
+                num_words = tf.reduce_sum(critic_loss_weights)
+
+                critic_loss_weights = tf.ones((critic_loss_weights.shape[0], critic_loss_weights.shape[1], one_hot_target.shape[2]), dtype=tf.float32) * tf.expand_dims(critic_loss_weights, axis=-1)
 
                 if not no_update:
-                    baselines = self.critic((batch[0], batch[1], samples, batch[3], batch[4]), regression=True, predict=True)
+                    baselines = self.critic((batch[0], batch[1], samples, batch[3], batch[4]), regression=True)
+                    print('baselines', baselines.shape)
 
-                    critic_loss = tf.nn.softmax_cross_entropy_with_logits(rewards, baselines, dtype=tf.float32)
+                    critic_loss = weighted_mse(baselines, rewards, critic_loss_weights)
                     print(baselines)
                     print(critic_loss.shape)
                     print([var.name for var in critic_tape.watched_variables()])
                     grads = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
                     self.critic.optimizer.apply_gradients(zip(grads, self.critic.trainable_variables))
+
+                    critic_loss = tf.reduce_sum(critic_loss)
                 else:
                     critic_loss = 0
 
@@ -148,8 +156,8 @@ class ReinforceTrainer:
                 else:
                     actor_loss = 0
 
-            total_reward += total_reward
-            reported_reward += rewards
+            total_rewards += total_reward
+            reported_rewards += total_reward
 
             total_sentences += batch_size
             reported_sentences += batch_size
@@ -161,18 +169,18 @@ class ReinforceTrainer:
             reported_words += num_words
 
             print(f'Iteration: {i}, loss: {actor_loss}')
-            print(f'Iteration: {i}, reward: {reported_reward / reported_sentences}')
+            print(f'Iteration: {i}, reward: {reported_rewards / reported_sentences}')
 
             if i % 1 == 0 and i > 0:
-                print(f'Epoch {epoch_index} {i}/{len(self.training_data)} --- Actor Reward: {reported_reward * 100 / reported_sentences} --- Critic Loss: {reported_critic_loss / reported_words} --- {reported_words / (time.time() - last_reported_time)}tokens/sec --- {time.time() - start_time} seconds from start')
+                print(f'Epoch {epoch_index} {i}/{len(self.training_data)} --- Actor Reward: {reported_rewards * 100 / reported_sentences} --- Critic Loss: {reported_critic_loss / reported_words} --- {reported_words / (time.time() - last_reported_time)}tokens/sec --- {time.time() - start_time} seconds from start')
 
-                reported_reward = 0
+                reported_rewards = 0
                 reported_sentences = 0
                 reported_critic_loss = 0
                 reported_words = 0
 
                 last_reported_time = time.time()
 
-        return total_reward / total_sentences, total_critic_loss / total_words
+        return total_rewards / total_sentences, total_critic_loss / total_words
             
 

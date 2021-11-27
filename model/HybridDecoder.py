@@ -55,14 +55,12 @@ class HybridDecoder(tf.keras.layers.Layer):
         embedding, output, tree_hidden, tree_context, text_hidden, text_context = state
 
         embeddings = self.word_lut(inputs)
-        embeddings = tf.reshape(
-            embeddings, (embeddings.shape[1], embeddings.shape[0], embeddings.shape[2]))
+        embeddings = tf.reshape(embeddings, (embeddings.shape[1], embeddings.shape[0], embeddings.shape[2]))
 
         outputs = []
 
         for i in range(inputs.shape[1]):
-            output, tree_hidden, text_hidden = self.step(
-                embedding, output, tree_hidden, tree_context, text_hidden, text_context)
+            output, tree_hidden, text_hidden = self.step(embedding, output, tree_hidden, tree_context, text_hidden, text_context)
             outputs.append(output)
             embedding = embeddings[i]
 
