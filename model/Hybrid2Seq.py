@@ -73,79 +73,85 @@ class Hybrid2Seq(tf.keras.Model):
 
         return target, one_hot_target, (embedding, initial_output, tree_encoder_hidden, tf.transpose(tree_encoder_context_padded, perm=[1, 0, 2]), text_encoder_hidden, tf.transpose(text_encoder_context, perm=[1, 0, 2]))
 
-    def call(self, batch, training=False):
+    def call(self, batch, regression = False, predict = False):
         targets, one_hot_target, initial_states = self.initialize(batch)
         outputs = self.hybrid_decoder(targets, initial_states)
 
         print('hybrid2seq call')
         print(outputs.shape)
 
-        if training:
-            logits = self.generator(outputs)
-            print('logists shape', logits.shape)
-            print('target shape', one_hot_target.shape)
-            return tf.reshape(logits, one_hot_target.shape)
-
-        print('reshaped successfully')
+        if regression:
+            if not predict:
+                logits = self.generator(outputs)
+                return tf.reshape(logits, one_hot_target.shape)
+            else:
+                return self.predict(outputs)
 
         return outputs
 
-    #TODO: this is wrong
     def predict(self, outputs):
-        return self.generate.predict(outputs)
+        return self.generator.predict(outputs)
 
     def translate(self, inputs, max_length: int):
-        targets, initial_states = self.initialize(inputs, eval=True)
-        embeddings, output, hidden, context = initial_states
+        targets, _, initial_states = self.initialize(inputs)
+        embeddings, output, tree_hidden, tree_context, text_hidden, text_context = initial_states
 
         predictions = []
-        batch_size = targets.shape[1]
-        eos_indices = tf.zeros([batch_size], dtype=tf.int32)
+        batch_size = targets.shape[0]
+        reached_eos = tf.zeros((batch_size), dtype=tf.bool)
 
-        for i in range(max_length):
-            output, hidden = self.hybrid_decoder.step(
-                embeddings, output, hidden, context)
-            logit = self.generator(output)
-            prediction = tf.reshape(logit.max(1)[1], -1)
+        for _ in range(max_length):
+            output, tree_hidden, text_hidden = self.hybrid_decoder.step(
+                embeddings, output, tree_hidden, tree_context, text_hidden, text_context)
+
+            logits = self.generator.translate(output)
+
+            prediction = tf.math.argmax(logits, axis=1)
+            print(prediction.shape)
             predictions.append(prediction)
 
-            eos_indices |= (prediction == EOS)
-            if eos_indices.sum() == batch_size:
+            reached_eos |= (prediction == EOS)
+            if tf.reduce_sum(tf.cast(reached_eos, dtype=tf.int32)) == batch_size:
                 break
 
-            # TODO: fix this
-            embeddings = self.hybrid_decoder.word_lut(tf.Tensor(prediction))
+            embeddings = self.hybrid_decoder.word_lut(prediction)
 
         predictions = tf.stack(predictions, axis=1)
         return predictions
 
     def sample(self, inputs, max_length: int):
-        targets, initial_states = self.initialize(inputs, eval=False)
-        embeddings, output, hidden, context = initial_states
+        targets, _, initial_states = self.initialize(inputs)
+        embeddings, output, tree_hidden, tree_context, text_hidden, text_context = initial_states
 
         outputs = []
         samples = []
-        batch_size = targets.shape[1]
-        eos_indices = tf.zeros([batch_size], dtype=tf.int32)
 
-        for i in range(max_length):
-            output, hidden = self.decoder.step(
-                embeddings, output, hidden, context)
+        batch_size = targets.shape[0]
+        reached_eos = tf.zeros((batch_size), dtype=tf.bool)
+
+        for _ in range(max_length):
+            output, tree_hidden, text_hidden = self.hybrid_decoder.step(embeddings, output, tree_hidden, tree_context, text_hidden, text_context)
             outputs.append(output)
 
-            distance = tf.keras.layers.softmax()(self.generator(output))
-            # TODO: tf should go here?
-            sample = 1  # ???
+            distribution = tf.nn.softmax(self.generator.translate(output))
+
+            sample = tf.squeeze(tf.random.categorical(logits=distribution, num_samples=1))
             samples.append(sample)
 
-            eos_indices |= (sample == EOS)
-            if eos_indices.sum() == batch_size:
+            print(output.shape)
+            print(sample.shape)
+
+            reached_eos |= (sample == EOS)
+            if tf.reduce_sum(tf.cast(reached_eos, dtype=tf.int32)) == batch_size:
                 break
 
-            # TODO: fix this too
-            embeddings = self.hybrid_decoder.word_lut(tf.Tensor(sample))
+            embeddings = self.hybrid_decoder.word_lut(sample)
 
         outputs = tf.stack(outputs, axis=1)
         samples = tf.stack(samples, axis=1)
+
+        print(outputs.shape)
+        print(samples.shape)
+        print('qwe')
 
         return samples, outputs

@@ -16,8 +16,6 @@ class Evaluator:
         self.max_length = max_length
 
     def evaluate(self, data, pred_file = None):
-        self.model.eval()
-
         total_loss = 0
         total_words = 0
         total_sentences = 0
@@ -29,27 +27,31 @@ class Evaluator:
 
         for i in range(len(data)):
             batch = data[i]
+            batch = batch[0]
 
             targets = batch[2]
-            code_attention_mask = tf.math.equal(batch[1][2][0], tf.constant(PAD))
-            text_attention_mask = tf.math.equal(batch[0][0], tf.constant(PAD))
+
+            code_attention_mask = tf.cast(tf.math.equal(batch[1][2][0], tf.constant(PAD)), dtype=tf.float32)
+            text_attention_mask = tf.cast(tf.math.equal(batch[0][0], tf.constant(PAD)), dtype=tf.float32)
 
             self.model.hybrid_decoder.attention.apply_mask(code_attention_mask, text_attention_mask)
 
-            outputs = self.model(batch, True)
+            outputs = self.model(batch, training=False)
 
-            loss_weights = tf.math.not_equal(targets, tf.constant(PAD, dtype=tf.float64))
+            loss_weights = tf.cast(tf.math.not_equal(targets, tf.constant(PAD)), dtype=tf.float32)
             num_words = tf.reduce_sum(loss_weights)
-            _, loss = self.model.predict(outputs, targets, loss_weights, self.loss_function)
 
+            prediction = self.model.predict(outputs)
+            loss = tf.reduce_sum(tf.nn.weighted_cross_entropy_with_logits(tf.cast(targets, dtype=tf.float32), tf.cast(prediction, dtype=tf.float32), loss_weights))
+            
             predictions = self.model.translate(batch, self.max_length)
             sources = batch[0][0]
 
-            rewards, _ = self.sentence_reward(predictions, targets)
+            rewards, _ = self.sentence_reward(predictions.numpy().tolist(), targets.numpy().tolist())
 
-            all_predictions.extend(predictions)
-            all_targets.extend(targets)
-            all_sources.extend(sources)
+            all_predictions.extend(predictions.numpy().tolist())
+            all_targets.extend(targets.numpy().tolist())
+            all_sources.extend(sources.numpy().tolist())
 
             total_loss += loss
             total_words += num_words

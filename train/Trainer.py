@@ -26,7 +26,7 @@ class Trainer:
         for epoch in range(start_epoch, end_epoch + 1):
             print('* CorssEntropy Epoch *')
             print(
-                f'Model optimizer LearningRate: {self.optimizer.learning_rate}')
+                f'Model optimizer LearningRate: {self.modal.optimizer.lr.read_value()}')
 
             train_loss = self.train_epoch(epoch, start_time)
 
@@ -41,8 +41,6 @@ class Trainer:
                 f'Validation sentence reward: {validation_sentence_reward * 100}')
             print(
                 f'Validation sentence reward: {validation_corpus_reward * 100}')
-
-            self.optimizer.update_learning_rate(validation_loss, epoch)
 
             # TODO: checkpoint the model here
 
@@ -59,31 +57,23 @@ class Trainer:
         print(len(self.train_data_gen))
 
         for i in range(len(self.train_data_gen)):
-
             with tf.GradientTape() as tape:
                 batch = self.train_data_gen[i]
                 batch = batch[0]
 
                 targets = batch[2]
                 one_hot_target = batch[4]
-                code_attention_mask = tf.cast(tf.math.equal(
-                    batch[1][2][0], tf.constant(PAD)), dtype=tf.float32)
-                text_attention_mask = tf.cast(tf.math.equal(
-                    batch[0][0], tf.constant(PAD)), dtype=tf.float32)
+                code_attention_mask = tf.cast(tf.math.equal(batch[1][2][0], tf.constant(PAD)), dtype=tf.float32)
+                text_attention_mask = tf.cast(tf.math.equal(batch[0][0], tf.constant(PAD)), dtype=tf.float32)
 
-                self.model.hybrid_decoder.attention.apply_mask(
-                    code_attention_mask, text_attention_mask)
+                self.model.hybrid_decoder.attention.apply_mask(code_attention_mask, text_attention_mask)
 
-                print('entering model')
-                outputs = self.model(batch, training=True)
-                print('exited model')
-
-                loss_weights = tf.cast(tf.math.not_equal(
-                    targets, tf.constant(PAD)), dtype=tf.float32)
+                outputs = self.model(batch, regression=True)
+                
+                loss_weights = tf.cast(tf.math.not_equal(targets, tf.constant(PAD)), dtype=tf.float32)
                 num_words = tf.reduce_sum(loss_weights)
 
-                loss_weights = tf.ones(
-                    (loss_weights.shape[0], loss_weights.shape[1], one_hot_target.shape[2]), dtype=tf.float32) * tf.expand_dims(loss_weights, axis=-1)
+                loss_weights = tf.ones((loss_weights.shape[0], loss_weights.shape[1], one_hot_target.shape[2]), dtype=tf.float32) * tf.expand_dims(loss_weights, axis=-1)
 
                 loss = tf.nn.weighted_cross_entropy_with_logits(one_hot_target, outputs, loss_weights)
                 grads = tape.gradient(loss, self.model.trainable_variables)

@@ -62,8 +62,7 @@ class DataGenerator(tf.compat.v1.keras.utils.Sequence):
         return (
             (
                 (self.make_tensor(batch_src), src_lengths),
-                (batch_trees, tree_lengths,
-                 (self.make_tensor(batch_leafs), leaf_lengths)),
+                (batch_trees, tree_lengths, (self.make_tensor(batch_leafs), leaf_lengths)),
                 tf.convert_to_tensor(batch_tgt),
                 range(len(batch_src)),
                 tf.one_hot(np.asarray(batch_tgt), self.target_vocabulary_size)

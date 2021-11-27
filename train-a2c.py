@@ -192,6 +192,7 @@ def main():
     print("use_critic: ", use_critic)
 
     model = create_model(dicts)
+    print('asdasdasd', model.trainable_variables)
 
     # Metrics.
     metrics = {}
@@ -207,30 +208,25 @@ def main():
 
     optim = tf.keras.optimizers.Adam()
     print(optim)
-    cross_entropy_trainer = Trainer(model, supervised_data_gen,
-                           valid_data_gen, metrics, dicts, optim)
-
-    start_time = time.time()
+    #cross_entropy_trainer = Trainer(model, supervised_data_gen, valid_data_gen, metrics, dicts, optim)
 
     print("supervised training..")
     print("start_epoch: ", opt.start_epoch)
 
-    cross_entropy_trainer.train(opt.start_epoch, opt.start_reinforce - 1)
+    #cross_entropy_trainer.train(opt.start_epoch, opt.start_reinforce - 1)
 
     critic = create_model(dicts)
+    print('qweqweqwe', critic.trainable_variables)
     print("pretrain critic...")
 
     if opt.critic_pretrain_epochs > 0:
-        reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics,
-                                             dicts, optim, optim, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
+        reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics, dicts, optim, optim, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
         reinforce_trainer.train(
             opt.start_reinforce, opt.start_reinforce + opt.critic_pretrain_epochs - 1, True)
 
     print("reinforce training...")
-    reinforce_trainer = ReinforceTrainer(
-        model, critic, rl_data_gen, test_data_gen, metrics, dicts, optim, optim, opt)
-    reinforce_trainer.train(opt.start_reinforce +
-                            opt.critic_pretrain_epochs, opt.end_epoch, False)
+    reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics, dicts, optim, optim, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
+    reinforce_trainer.train(opt.start_reinforce + opt.critic_pretrain_epochs, opt.end_epoch, False)
 
 if __name__ == '__main__':
     main()

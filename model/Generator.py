@@ -12,7 +12,7 @@ class Generator(tf.keras.Model):
         self.linear = tf.keras.layers.Dense(
             target_vocabulary_size, use_bias=True)
 
-    # TODO: this shit is wrong as well
+    # TODO: this shit is wrong as well - nope
     def call(self, inputs):
         outputs = []
 
@@ -23,7 +23,11 @@ class Generator(tf.keras.Model):
 
         return tf.stack(outputs, axis=1)
 
-    # TODO: is this shit really correct?
+    #input: (B, H)
+    def translate(self, inputs):
+        return self.linear(inputs)
+
+    # TODO: is this shit really correct? - yes. correct
     def predict(self, inputs):
         logits = self.call(inputs)
         predictions = tf.math.argmax(logits, axis=-1)
