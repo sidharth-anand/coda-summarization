@@ -206,26 +206,24 @@ def main():
     print("opt.eval: ", opt.eval)
     print("opt.eval_sample: ", opt.eval_sample)
 
-    optim = tf.keras.optimizers.Adam()
-    print(optim)
-    #cross_entropy_trainer = Trainer(model, supervised_data_gen, valid_data_gen, metrics, dicts, optim)
+    cross_entropy_trainer = Trainer(model, supervised_data_gen, valid_data_gen, metrics, dicts)
 
     print("supervised training..")
     print("start_epoch: ", opt.start_epoch)
 
-    #cross_entropy_trainer.train(opt.start_epoch, opt.start_reinforce - 1)
+    cross_entropy_trainer.train(opt.start_epoch, opt.start_reinforce - 1)
 
     critic = create_model(dicts)
     
     print("pretrain critic...")
 
     if opt.critic_pretrain_epochs > 0:
-        reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics, dicts, optim, optim, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
+        reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics, dicts, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
         reinforce_trainer.train(
             opt.start_reinforce, opt.start_reinforce + opt.critic_pretrain_epochs - 1, True)
 
     print("reinforce training...")
-    reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics, dicts, optim, optim, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
+    reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics, dicts, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
     reinforce_trainer.train(opt.start_reinforce + opt.critic_pretrain_epochs, opt.end_epoch, False)
 
 if __name__ == '__main__':

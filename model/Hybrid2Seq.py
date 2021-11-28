@@ -7,10 +7,7 @@ from model.TextEncoder import TextEncoder
 from model.HybridDecoder import HybridDecoder
 from model.Generator import Generator
 
-from constants.constants import BOS, EOS, PAD
-
-# TODO: figure out backprop and loss
-
+from constants.constants import BOS, EOS
 
 class Hybrid2Seq(tf.keras.Model):
     def __init__(self, dictonaries: Dictionary, source_vocabulary_size: int, target_vocabulary_size: int) -> None:
@@ -24,7 +21,8 @@ class Hybrid2Seq(tf.keras.Model):
         self.hybrid_decoder = HybridDecoder(target_vocabulary_size)
         self.generator = Generator(target_vocabulary_size)
 
-        self.optimizer = tf.keras.optimizers.Adam(0.01)
+        self.learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(1e-3, decay_steps=10000, decay_rate=0.96)
+        self.optimizer = tf.keras.optimizers.Adam(1e-3)
 
     def initialize_decoder_output(self, text_encoder_context):
         batch_size = text_encoder_context.shape[0]
@@ -32,10 +30,7 @@ class Hybrid2Seq(tf.keras.Model):
         return tf.Variable(tf.zeros(hidden_size), trainable=False)
 
     # TODO: add typing to this shit
-    # TODO: eval???
     def initialize(self, batch):
-        # batch format
-        # return (make_tensor(batch_src),src_lengths), (batch_trees,tree_lengths, (make_tensor(batch_leafs),leaf_lengths)) , make_tensor(batch_tgt), range(len(batch_src))
         target = batch[2]
         one_hot_target = batch[4]
         trees = batch[1][0]
@@ -67,17 +62,14 @@ class Hybrid2Seq(tf.keras.Model):
 
         initial_output = self.initialize_decoder_output(text_encoder_context)
 
-        initial_token = tf.Variable(tf.convert_to_tensor(
-            [BOS] * initial_output.shape[0], dtype=tf.int32))
+        initial_token = tf.Variable(tf.convert_to_tensor([BOS] * initial_output.shape[0], dtype=tf.int32))
         embedding = self.hybrid_decoder.word_lut(initial_token)
 
         return target, one_hot_target, (embedding, initial_output, tree_encoder_hidden, tf.transpose(tree_encoder_context_padded, perm=[1, 0, 2]), text_encoder_hidden, tf.transpose(text_encoder_context, perm=[1, 0, 2]))
 
     def call(self, batch, regression = False, predict = False):
-        targets, one_hot_target, initial_states = self.initialize(batch)
+        targets, _, initial_states = self.initialize(batch)
         outputs = self.hybrid_decoder(targets, initial_states)
-
-        
 
         if regression:
             if not predict:
@@ -134,10 +126,8 @@ class Hybrid2Seq(tf.keras.Model):
 
             distribution = tf.nn.softmax(self.generator.translate(output))
 
-            sample = tf.squeeze(tf.random.categorical(logits=distribution, num_samples=1))
+            sample = tf.squeeze(tf.random.categorical(logits=distribution, num_samples=1,))
             samples.append(sample)
-
-            
 
             reached_eos |= (sample == EOS)
             if tf.reduce_sum(tf.cast(reached_eos, dtype=tf.int32)) == batch_size:

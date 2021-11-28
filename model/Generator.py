@@ -32,6 +32,6 @@ class Generator(tf.keras.Model):
     # TODO: is this shit really correct? - yes. correct
     def predict(self, inputs):
         logits = self.call(inputs)
-        predictions = tf.math.argmax(logits, axis=-1)
+        predictions = tf.cast(tf.math.argmax(logits, axis=-1), dtype=tf.float32)
 
         return predictions

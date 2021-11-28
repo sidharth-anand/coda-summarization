@@ -11,7 +11,7 @@ from loss.Loss import weighted_mse
 from constants.constants import PAD
 
 class ReinforceTrainer:
-    def __init__(self, actor, critic, training_data, validation_data, metrics, dictonaries, actor_optimizer, critic_optimizer, max_length: int, reinforcement_learning_rate: float, no_update: bool = False):
+    def __init__(self, actor, critic, training_data, validation_data, metrics, dictonaries, max_length: int, reinforcement_learning_rate: float, no_update: bool = False):
         self.actor = actor
         self.critic = critic
 
@@ -25,9 +25,6 @@ class ReinforceTrainer:
 
         self.dictionaries = dictonaries
 
-        self.actor_optimizer = actor_optimizer
-        self.critic_optimizer = critic_optimizer
-
         self.max_length = max_length
         self.reinforcement_learning_rate = reinforcement_learning_rate
         self.no_update = no_update
@@ -36,17 +33,17 @@ class ReinforceTrainer:
     def train(self, start_epoch: int, end_epoch: int, pretrain_critic: bool):
         start_time = time.time()
 
-        self.actor_optimizer.lr.assign(self.reinforcement_learning_rate)
+        self.actor.optimizer.lr.assign(self.reinforcement_learning_rate)
 
         if pretrain_critic:
-            self.critic_optimizer.lr.assign(1e-3)
+            self.critic.optimizer.lr.assign(1e-3)
         else:   
-            self.critic_optimizer.lr.assign(self.reinforcement_learning_rate)
+            self.critic.optimizer.lr.assign(self.reinforcement_learning_rate)
 
         for epoch in range(start_epoch, end_epoch + 1):
             print('* REINFORCE epoch *')
-            print(f'Actor optimizer LearningRate: {self.actor_optimizer.lr.read_value()}')
-            print(f'Critic optimizer LearningRate: {self.critic_optimizer.lr.read_value()}')
+            print(f'Actor optimizer LearningRate: {self.actor.optimizer.lr.read_value()}')
+            print(f'Critic optimizer LearningRate: {self.critic.optimizer.lr.read_value()}')
 
             if pretrain_critic:
                 print('Pretraining Critic')
@@ -70,7 +67,7 @@ class ReinforceTrainer:
                 break
             
             if not pretrain_critic:
-                self.critic_optimizer.set_learning_rate(self.actor_optimizer.learning_rate)
+                self.critic.optimizer.lr.assign(self.actor.optimizer.lr.read_value())
 
             #TODO: Checkpoint the model here
         
@@ -111,18 +108,8 @@ class ReinforceTrainer:
 
                 #TODO: add reward shaping here
 
-                
-                
-                
                 samples = tf.Variable(tf.convert_to_tensor(samples), trainable=True, name='actor:samples')
-                # targets and samples have different sequence length
                 rewards = tf.Variable(tf.stack([rewards] * one_hot_target.shape[2], axis=1), trainable=True, name='actor:rewards')
-
-                
-                
-                print('rewards', rewards.shape)
-
-                
 
                 critic_loss_weights = tf.cast(tf.math.not_equal(samples, tf.constant(PAD)), dtype=tf.float32)
                 num_words = tf.reduce_sum(critic_loss_weights)
@@ -131,16 +118,14 @@ class ReinforceTrainer:
 
                 if not no_update:
                     baselines = self.critic((batch[0], batch[1], samples, batch[3], batch[4]), regression=True)
+                    
                     rewards = tf.expand_dims(rewards, axis=-1)
                     rewards = tf.broadcast_to(rewards, [rewards.shape[0], rewards.shape[1], baselines.shape[1]])
                     rewards = tf.reshape(rewards, [rewards.shape[0], rewards.shape[2], rewards.shape[1]])
-                    
+
                     mask = np.zeros(rewards.shape, dtype=np.float32)
-                    mask[:, rewards.shape[1] - 1, :] = 1
+                    mask[:, rewards.shape[1] - 1, :] = tf.squeeze(tf.one_hot(samples, depth=one_hot_target.shape[2])[:, -1, :]).numpy()
                     rewards = rewards * mask
-                    
-                    
-                    
 
                     critic_loss = weighted_mse(baselines, rewards, critic_loss_weights)
                    
@@ -152,16 +137,17 @@ class ReinforceTrainer:
                     critic_loss = 0
 
                 if not pretrain_critic and not no_update:
-                    normalized_rewards = tf.Variable(rewards - baselines, trainable=True)
-                    actor_loss_weights = tf.cast(tf.math.multiply(normalized_rewards, critic_loss_weights), dtype=tf.float32)
-                    
+                    samples = tf.Variable(tf.one_hot(samples, one_hot_target.shape[2]), trainable=True)
 
-                    actor_loss = tf.nn.weighted_cross_entropy_with_logits(logits=tf.cast(self.actor.predict(outputs), dtype=tf.float32), labels=tf.cast(samples, dtype=tf.float32), pos_weight=actor_loss_weights)
+                    normalized_rewards = tf.Variable(rewards - baselines, trainable=True)
+                    actor_loss_weights = tf.math.multiply(normalized_rewards, critic_loss_weights)
+                    
+                    predictions = self.actor.generator(outputs)
+
+                    actor_loss = tf.nn.weighted_cross_entropy_with_logits(samples, predictions, pos_weight=actor_loss_weights)
                     grads = actor_tape.gradient(actor_loss, self.actor.trainable_variables)
                     
                     self.actor.optimizer.apply_gradients(zip(grads, self.actor.trainable_variables))
-                    
-                    self.actor_optimizer.step()
                 else:
                     actor_loss = 0
 

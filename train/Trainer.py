@@ -9,13 +9,12 @@ from constants.constants import PAD
 
 
 class Trainer:
-    def __init__(self, model: tf.keras.Model, train_data_gen: tf.keras.Sequential, validation_data_gen: tf.keras.Sequential, metrics: dict, dictionaries: dict, optimizer: tf.keras.optimizers, iterations_per_log=1):
+    def __init__(self, model: tf.keras.Model, train_data_gen: tf.keras.Sequential, validation_data_gen: tf.keras.Sequential, metrics: dict, dictionaries: dict, iterations_per_log=1):
         self.model = model
         self.train_data_gen = train_data_gen
         self.validation_data_gen = validation_data_gen
         self.evaluator = Evaluator(model, metrics, dictionaries)
         self.dictionaries = dictionaries
-        self.optimizer = optimizer
         self.iterations_per_log = iterations_per_log
 
         self.loss_function = metrics['cross_entropy_loss']
@@ -25,8 +24,6 @@ class Trainer:
 
         for epoch in range(start_epoch, end_epoch + 1):
             print('* CorssEntropy Epoch *')
-            print(
-                f'Model optimizer LearningRate: {self.modal.optimizer.lr.read_value()}')
 
             train_loss = self.train_epoch(epoch, start_time)
 
