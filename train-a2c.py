@@ -30,7 +30,7 @@ def get_opt():
 
     # Optimization options
     parser.add_argument('-batch_size', type=int,
-                        default=2, help='Maximum batch size')
+                        default=4, help='Maximum batch size')
 
     parser.add_argument("-end_epoch", type=int, default=50,
                         help="Epoch to stop training.")
@@ -88,6 +88,9 @@ def get_opt():
     parser.add_argument("-var_length", action="store_true",
                         help="Evaluate model only")
     parser.add_argument('-var_type', default='code', help="Type of var.")
+
+    #Resume Checkpointing
+    parser.add_argument('-resume', type=bool, default=False, help="Whether to resume checkpoining or not")
 
     opt = parser.parse_args()
     opt.iteration = 0
@@ -211,7 +214,7 @@ def main():
     print("supervised training..")
     print("start_epoch: ", opt.start_epoch)
 
-    cross_entropy_trainer.train(opt.start_epoch, opt.start_reinforce - 1)
+    cross_entropy_trainer.train(opt.start_epoch, opt.start_reinforce - 1, opt.resume)
 
     critic = create_model(dicts)
     
@@ -220,7 +223,7 @@ def main():
     if opt.critic_pretrain_epochs > 0:
         reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics, dicts, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)
         reinforce_trainer.train(
-            opt.start_reinforce, opt.start_reinforce + opt.critic_pretrain_epochs - 1, True)
+            opt.start_reinforce, opt.start_reinforce + opt.critic_pretrain_epochs - 1, True, opt.resume)
 
     print("reinforce training...")
     reinforce_trainer = ReinforceTrainer(model, critic, supervised_data_gen, test_data_gen, metrics, dicts, reinforcement_learning_rate=1e-3, max_length=opt.max_predict_length)

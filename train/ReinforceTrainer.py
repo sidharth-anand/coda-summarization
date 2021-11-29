@@ -1,6 +1,7 @@
 import math
 import time
 import numpy as np
+import os
 
 import tensorflow as tf
 
@@ -30,7 +31,7 @@ class ReinforceTrainer:
         self.no_update = no_update
         #TODO: Add reward shaping here
 
-    def train(self, start_epoch: int, end_epoch: int, pretrain_critic: bool):
+    def train(self, start_epoch: int, end_epoch: int, pretrain_critic: bool, resume:bool):
         start_time = time.time()
 
         self.actor.optimizer.lr.assign(self.reinforcement_learning_rate)
@@ -41,6 +42,15 @@ class ReinforceTrainer:
             self.critic.optimizer.lr.assign(self.reinforcement_learning_rate)
 
         for epoch in range(start_epoch, end_epoch + 1):
+
+            if resume and os.path.isfile(f'weights/critic_{epoch}.h5'):
+                if pretrain_critic:
+                    self.model.load_weights(f'weights/critic_{epoch}.h5')
+                elif not pretrain_critic and os.path.isfile(f'weights/actor_{epoch}.h5'):
+                    self.model.load_weights(f'weights/critic_{epoch}.h5')
+                    self.model.load_weights(f'weights/actor_{epoch}.h5')
+                continue
+
             print('* REINFORCE epoch *')
             print(f'Actor optimizer LearningRate: {self.actor.optimizer.lr.read_value()}')
             print(f'Critic optimizer LearningRate: {self.critic.optimizer.lr.read_value()}')
@@ -63,13 +73,55 @@ class ReinforceTrainer:
             print(f'Validation sentence reward: {validation_sentence_reward * 100}')
             print(f'Validation corpus reward: {validation_corpus_reward * 100}')
 
+            val_batch = self.validation_data[0]
+
+            
+            #TODO: prettify this clusterfuck
+
+            val_batch = val_batch[0]
+            targets = val_batch[2].numpy()
+            source = val_batch[0][0].numpy()
+            code_attention_mask = tf.cast(tf.math.equal(val_batch[1][2][0], tf.constant(PAD)), dtype=tf.float32)
+            text_attention_mask = tf.cast(tf.math.equal(val_batch[0][0], tf.constant(PAD)), dtype=tf.float32)
+            self.actor.hybrid_decoder.attention.apply_mask(code_attention_mask, text_attention_mask)
+            #actor results
+            outputs = self.actor(val_batch, regression=True)
+            outputs = tf.argmax(outputs, axis=-1).numpy()
+            with open('results/RL_actor_results.txt','a') as f:
+                for i,sentence in enumerate(outputs):
+                    f.write(f'code {i+1}' + ' '.join(self.dictionaries['src'].reverse_lookup(token) for token in source[i]) + '\n')
+                    f.write(f'prediction {i+1}: ' + ' '.join(self.dictionaries['tgt'].reverse_lookup(token) for token in sentence) + '\n')
+                    f.write(f'target {i+1}: ' + ' '.join(self.dictionaries['tgt'].reverse_lookup(token) for token in targets[i]) + '\n')
+            f.close()
+
+            #critic results
+            outputs = self.critic(val_batch, regression=True)
+            outputs = tf.argmax(outputs, axis=-1).numpy()
+            with open('results/RL_critic_results.txt','a') as f:
+                for i,sentence in enumerate(outputs):
+                    f.write(f'code {i+1}' + ' '.join(self.dictionaries['src'].reverse_lookup(token) for token in source[i]) + '\n')
+                    f.write(f'prediction {i+1}: ' + ' '.join(self.dictionaries['tgt'].reverse_lookup(token) for token in sentence) + '\n')
+                    f.write(f'target {i+1}: ' + ' '.join(self.dictionaries['tgt'].reverse_lookup(token) for token in targets[i]) + '\n')
+            f.close()
+
             if no_update:
                 break
             
             if not pretrain_critic:
                 self.critic.optimizer.lr.assign(self.actor.optimizer.lr.read_value())
 
-            #TODO: Checkpoint the model here
+            if pretrain_critic:
+                if not resume or (resume and not os.path.isfile(f'weights/critic_{epoch}.h5')):
+                    print(f'Saving epoch {epoch} of Critic:')
+                    self.critic.save_weights(f'weights/critic_{epoch}.h5')
+
+            else:
+                if not resume or (resume and not (os.path.isfile(f'weights/critic_{epoch}.h5') and os.path.isfile(f'weights/actor_{epoch}.h5'))):
+                    print(f'Saving epoch {epoch} of Critic:')
+                    self.critic.save_weights(f'weights/critic_{epoch}.h5')
+                    print(f'Saving epoch {epoch} of Actor:')
+                    self.actor.save_weights(f'weights/actor_{epoch}.h5')
+
         
     def train_epoch(self, epoch_index: int, pretrain_critic: bool, no_update: bool, start_time):
         total_rewards = 0

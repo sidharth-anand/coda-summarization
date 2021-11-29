@@ -7,17 +7,15 @@ class BinaryTreeComposer(tf.keras.layers.Layer):
         self.hidden_state_size = hidden_state_size
         self.gate_output = gate_output
 
-        self.ilh, self.irh = self.create_gate(hidden_state_size)
-        self.lflh, self.lfrh = self.create_gate(hidden_state_size)
-        self.rflh, self.rfrh = self.create_gate(hidden_state_size)
-        self.ulh, self.urh = self.create_gate(hidden_state_size)
+        self.ilh, self.irh = self.create_gate(hidden_state_size, '1')
+        self.lflh, self.lfrh = self.create_gate(hidden_state_size, '2')
+        self.rflh, self.rfrh = self.create_gate(hidden_state_size, '3')
+        self.ulh, self.urh = self.create_gate(hidden_state_size, '4')
 
-        if gate_output:
-            self.olh, self.orh = self.create_gate(hidden_state_size)
 
-    def create_gate(self, size: int) -> tuple:
-        lh = tf.keras.layers.Dense(size, use_bias=True)
-        rh = tf.keras.layers.Dense(size, use_bias=True)
+    def create_gate(self, size: int, name: str) -> tuple:
+        lh = tf.keras.layers.Dense(size, use_bias=True, name=f'{name}_lh')
+        rh = tf.keras.layers.Dense(size, use_bias=True, name=f'{name}_rh')
         return lh, rh
 
     def call(self, lc: tf.Tensor, lh: tf.Tensor, rc: tf.Tensor, rh: tf.Tensor) -> tuple:
@@ -30,12 +28,9 @@ class BinaryTreeComposer(tf.keras.layers.Layer):
         current = tf.math.add(tf.math.multiply(i, update), tf.math.multiply(lf, lc), tf.math.multiply(rf, rc))
         
 
-        if self.gate_output:
-            output = tf.keras.activations.sigmoid(tf.math.add(self.olh(lh), self.orh(rh)))
-            #Tensor of (1, hidden_state_size)
-            hidden = tf.math.multiply(output, tf.math.tanh(current))
-        else:
-            #Tensor of (1, hidden_state_size)
-            hidden = tf.math.tanh(current)
+        
+        
+        #Tensor of (1, hidden_state_size)
+        hidden = tf.math.tanh(current)
         
         return current, hidden

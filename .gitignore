@@ -2,3 +2,5 @@
 dataset/original/*
 dataset/processed/*
 __pycache__
+weights/*
+results/*
