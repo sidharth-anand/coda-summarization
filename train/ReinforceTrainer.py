@@ -43,12 +43,12 @@ class ReinforceTrainer:
 
         for epoch in range(start_epoch, end_epoch + 1):
 
-            if resume and os.path.isfile(f'weights/critic_{epoch}.h5'):
+            if resume and os.path.isfile(f'weights/critic.h5'):
                 if pretrain_critic:
-                    self.model.load_weights(f'weights/critic_{epoch}.h5')
-                elif not pretrain_critic and os.path.isfile(f'weights/actor_{epoch}.h5'):
-                    self.model.load_weights(f'weights/critic_{epoch}.h5')
-                    self.model.load_weights(f'weights/actor_{epoch}.h5')
+                    self.model.load_weights(f'weights/critic.h5')
+                elif not pretrain_critic and os.path.isfile(f'weights/actor.h5'):
+                    self.model.load_weights(f'weights/critic.h5')
+                    self.model.load_weights(f'weights/actor.h5')
                 continue
 
             print('* REINFORCE epoch *')
@@ -79,14 +79,14 @@ class ReinforceTrainer:
             #TODO: prettify this clusterfuck
 
             val_batch = val_batch[0]
-            targets = val_batch[2].numpy()
-            source = val_batch[0][0].numpy()
+            targets = val_batch[2].numpy()[0:5]
+            source = val_batch[0][0].numpy()[0:5]
             code_attention_mask = tf.cast(tf.math.equal(val_batch[1][2][0], tf.constant(PAD)), dtype=tf.float32)
             text_attention_mask = tf.cast(tf.math.equal(val_batch[0][0], tf.constant(PAD)), dtype=tf.float32)
             self.actor.hybrid_decoder.attention.apply_mask(code_attention_mask, text_attention_mask)
             #actor results
             outputs = self.actor(val_batch, regression=True)
-            outputs = tf.argmax(outputs, axis=-1).numpy()
+            outputs = tf.argmax(outputs, axis=-1).numpy()[0:5]
             with open('results/RL_actor_results.txt','a') as f:
                 for i,sentence in enumerate(outputs):
                     f.write(f'code {i+1}' + ' '.join(self.dictionaries['src'].reverse_lookup(token) for token in source[i]) + '\n')
@@ -96,7 +96,7 @@ class ReinforceTrainer:
 
             #critic results
             outputs = self.critic(val_batch, regression=True)
-            outputs = tf.argmax(outputs, axis=-1).numpy()
+            outputs = tf.argmax(outputs, axis=-1).numpy()[0:5]
             with open('results/RL_critic_results.txt','a') as f:
                 for i,sentence in enumerate(outputs):
                     f.write(f'code {i+1}' + ' '.join(self.dictionaries['src'].reverse_lookup(token) for token in source[i]) + '\n')
@@ -111,16 +111,16 @@ class ReinforceTrainer:
                 self.critic.optimizer.lr.assign(self.actor.optimizer.lr.read_value())
 
             if pretrain_critic:
-                if not resume or (resume and not os.path.isfile(f'weights/critic_{epoch}.h5')):
+                if not resume or (resume and not os.path.isfile(f'weights/critic.h5')):
                     print(f'Saving epoch {epoch} of Critic:')
-                    self.critic.save_weights(f'weights/critic_{epoch}.h5')
+                    self.critic.save_weights(f'weights/critic.h5')
 
             else:
-                if not resume or (resume and not (os.path.isfile(f'weights/critic_{epoch}.h5') and os.path.isfile(f'weights/actor_{epoch}.h5'))):
+                if not resume or (resume and not (os.path.isfile(f'weights/critic.h5') and os.path.isfile(f'weights/actor.h5'))):
                     print(f'Saving epoch {epoch} of Critic:')
-                    self.critic.save_weights(f'weights/critic_{epoch}.h5')
+                    self.critic.save_weights(f'weights/critic.h5')
                     print(f'Saving epoch {epoch} of Actor:')
-                    self.actor.save_weights(f'weights/actor_{epoch}.h5')
+                    self.actor.save_weights(f'weights/actor.h5')
 
         
     def train_epoch(self, epoch_index: int, pretrain_critic: bool, no_update: bool, start_time):

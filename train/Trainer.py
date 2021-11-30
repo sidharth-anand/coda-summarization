@@ -26,8 +26,8 @@ class Trainer:
 
         for epoch in range(start_epoch, end_epoch + 1):
             
-            if resume and os.path.isfile(f'weights/DL_{epoch}.h5'):
-                self.model.load_weights(f'weights/DL_{epoch}.h5')
+            if resume and os.path.isfile(f'weights/DL.h5'):
+                self.model.load_weights(f'weights/DL.h5')
                 continue
 
             print('* CrossEntropy Epoch *')
@@ -51,8 +51,8 @@ class Trainer:
             
 
             val_batch = val_batch[0]
-            targets = val_batch[2].numpy()
-            source = val_batch[0][0].numpy()
+            targets = val_batch[2].numpy()[0:5]
+            source = val_batch[0][0].numpy()[0:5]
             code_attention_mask = tf.cast(tf.math.equal(val_batch[1][2][0], tf.constant(PAD)), dtype=tf.float32)
             text_attention_mask = tf.cast(tf.math.equal(val_batch[0][0], tf.constant(PAD)), dtype=tf.float32)
 
@@ -60,7 +60,7 @@ class Trainer:
 
             outputs = self.model(val_batch, regression=True)
 
-            outputs = tf.argmax(outputs, axis=-1).numpy()
+            outputs = tf.argmax(outputs, axis=-1).numpy()[0:5]
 
             with open('results/xent_results.txt','a') as f:
                 for i,sentence in enumerate(outputs):
@@ -77,7 +77,7 @@ class Trainer:
             # TODO: checkpoint the model here
             if not resume or (resume and not os.path.isfile(f'weights/DL_{epoch}.h5')):
                 print(f'Saving epoch {epoch} of DL:')
-                self.model.save_weights(f'weights/DL_{epoch}.h5')
+                self.model.save_weights(f'weights/DL.h5')
 
 
     def train_epoch(self, epoch_index: int, training_start):

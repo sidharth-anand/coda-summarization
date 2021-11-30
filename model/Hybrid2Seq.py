@@ -22,7 +22,7 @@ class Hybrid2Seq(tf.keras.Model):
         self.generator = Generator(target_vocabulary_size)
 
         self.learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(1e-3, decay_steps=10000, decay_rate=0.96)
-        self.optimizer = tf.keras.optimizers.Adam(1e-3)
+        self.optimizer = tf.keras.optimizers.Adam(1e-4)
 
     def initialize_decoder_output(self, text_encoder_context):
         batch_size = text_encoder_context.shape[0]
