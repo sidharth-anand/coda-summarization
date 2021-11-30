@@ -3,6 +3,8 @@ from typing import List
 import numpy as np
 import tensorflow as tf
 
+from data.Graph import merge_graphs
+
 from constants.constants import PAD
 
 
@@ -47,7 +49,7 @@ class DataGenerator(tf.compat.v1.keras.utils.Sequence):
         batch_src = [self.data['src'][k] for k in indexes]
         batch_tgt = [self.data['tgt'][k] for k in indexes]
         batch_trees = [self.data['trees'][k] for k in indexes]
-        batch_leafs = [self.data['leafs'][k] for k in indexes]
+        batch_leafs = [[0] * 64] * 64
 
         batch_src, src_lengths = self.__batchify__(
             batch_src, include_lengths=True)
@@ -56,13 +58,18 @@ class DataGenerator(tf.compat.v1.keras.utils.Sequence):
         batch_tgt = self.__batchify__(batch_tgt)
 
         tree_lengths = []
-        for tree in batch_trees:
-            tree_lengths.append(tree.leaf_count())
+        node_to_graph_map = list(np.concatenate([[i] * len(tree['node_list']) for i, tree in enumerate(batch_trees)]).flat)
+
+        merged_tree_batch = batch_trees[0]
+        for tree in batch_trees[1:]:
+            merged_tree_batch = merge_graphs(merged_tree_batch, tree)
+
+        print('nodes', merged_tree_batch['node_list'])
 
         return (
             (
                 (self.make_tensor(batch_src), src_lengths),
-                (batch_trees, tree_lengths, (self.make_tensor(batch_leafs), leaf_lengths)),
+                (merged_tree_batch, tree_lengths, (self.make_tensor(batch_leafs), leaf_lengths), node_to_graph_map),
                 tf.convert_to_tensor(batch_tgt),
                 range(len(batch_src)),
                 tf.one_hot(np.asarray(batch_tgt), self.target_vocabulary_size)

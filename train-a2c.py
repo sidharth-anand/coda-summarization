@@ -108,6 +108,8 @@ def get_data_trees(trees):
     return np.array(data_trees)
 
 
+
+
 def get_data_leafs(trees, srcDicts):
     leafs = []
     for tree in trees:
@@ -134,19 +136,19 @@ def load_data(filename, batch_size):
 
     dicts = dataset['dicts']
 
-    dataset["train_xe"]['trees'] = get_data_trees(dataset["train_xe"]['trees'])
-    dataset["train_pg"]['trees'] = get_data_trees(dataset["train_pg"]['trees'])
-    dataset["valid"]['trees'] = get_data_trees(dataset["valid"]['trees'])
-    dataset["test"]['trees'] = get_data_trees(dataset["test"]['trees'])
+    # dataset["train_xe"]['trees'] = get_data_trees(dataset["train_xe"]['trees'])
+    # dataset["train_pg"]['trees'] = get_data_trees(dataset["train_pg"]['trees'])
+    # dataset["valid"]['trees'] = get_data_trees(dataset["valid"]['trees'])
+    # dataset["test"]['trees'] = get_data_trees(dataset["test"]['trees'])
 
-    dataset["train_xe"]['leafs'] = get_data_leafs(
-        dataset["train_xe"]['trees'], dicts['src'])
-    dataset["train_pg"]['leafs'] = get_data_leafs(
-        dataset["train_pg"]['trees'], dicts['src'])
-    dataset["valid"]['leafs'] = get_data_leafs(
-        dataset["valid"]['trees'], dicts['src'])
-    dataset["test"]['leafs'] = get_data_leafs(
-        dataset["test"]['trees'], dicts['src'])
+    # dataset["train_xe"]['leafs'] = get_data_leafs(
+    #     dataset["train_xe"]['trees'], dicts['src'])
+    # dataset["train_pg"]['leafs'] = get_data_leafs(
+    #     dataset["train_pg"]['trees'], dicts['src'])
+    # dataset["valid"]['leafs'] = get_data_leafs(
+    #     dataset["valid"]['trees'], dicts['src'])
+    # dataset["test"]['leafs'] = get_data_leafs(
+    #     dataset["test"]['trees'], dicts['src'])
 
     supervised_data_gen = DataGenerator(dataset["train_xe"], dicts['tgt'].size,batch_size=batch_size, shuffle=True)
     rl_data_gen = DataGenerator(dataset["train_pg"], dicts['tgt'].size,batch_size=batch_size)

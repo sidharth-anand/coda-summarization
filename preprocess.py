@@ -5,6 +5,7 @@ import numpy as np
 import typing
 
 from data.Tree import python2tree, python_tokenize, traverse_python_tree, split_tree, merge_tree, init_vocabulary
+from data.Graph import run_tree
 
 from constants.constants import UNK_WORD, EOS_WORD
 
@@ -42,8 +43,8 @@ def get_opt():
     parser.add_argument('--tgt-vocab-size', type=int,
                         default=50000, help="Size of the target vocabulary")
     parser.add_argument('--src-seq-length', type=int,
-                        default=150, help="Maximum source sequence length")
-    parser.add_argument('--tgt-seq-length', type=int, default=50,
+                        default=200, help="Maximum source sequence length")
+    parser.add_argument('--tgt-seq-length', type=int, default=100,
                         help="Maximum target sequence length to keep.")
 
     parser.add_argument('-seed',       type=int,
@@ -68,6 +69,9 @@ def make_data(source_file_path: str, target_file_path: str, source_dictionaries:
     target_file = open(target_file_path, 'r',
                        encoding='utf-8', errors='ignore')
 
+    node_types = {}
+    edge_types = {}
+
     while True:
         sline = source_flie.readline().strip()
         tline = target_file.readline().strip()
@@ -77,8 +81,8 @@ def make_data(source_file_path: str, target_file_path: str, source_dictionaries:
             break
 
         if opt.data_name == 'github-python':
-            srcLine = python_tokenize(sline.replace(
-                ' DCNL DCSP ', '').replace(' DCNL ', '').replace(' DCSP ', ''))
+            srcLine = sline.replace(
+                ' DCNL DCSP ', '').replace(' DCNL ', '').replace(' DCSP ', '')
             tgtLine = tline.replace(' DCNL DCSP ', '').replace(
                 ' DCNL ', '').replace(' DCSP ', '').split()
             sline = sline.replace(' DCNL DCSP ', '\n\t').replace(' DCNL  DCSP ', '\n\t').replace(
@@ -93,19 +97,16 @@ def make_data(source_file_path: str, target_file_path: str, source_dictionaries:
 
         if len(srcLine) <= opt.src_seq_length and len(tgtLine) <= opt.tgt_seq_length:
             try:
-                atok, tree = python2tree(sline)
-                tree_json = traverse_python_tree(atok, tree)
+                tree = run_tree(sline, node_types, edge_types)
 
-                tree_json = split_tree(tree_json, len(tree_json))
-                tree_json = merge_tree(tree_json)
-
-                trees += [tree_json]
+                trees += [tree]
 
                 src += [source_dictionaries.convert_to_index(
                     srcLine, UNK_WORD)]
                 tgt += [target_dictonaries.convert_to_index(tgtLine,
                                                             UNK_WORD, eos_word=EOS_WORD)]
                 sizes += [len(src)]
+
             except Exception as e:
                 print('Exception: ', e)
                 print(sline)

@@ -39,6 +39,7 @@ class Trainer:
             print(
                 f'Validation sentence reward: {validation_corpus_reward * 100}')
 
+            self.model.save_weights(f'weights/{epoch}.h5')
             # TODO: checkpoint the model here
 
     def train_epoch(self, epoch_index: int, training_start):

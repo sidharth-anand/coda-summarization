@@ -1,11 +1,14 @@
 import tensorflow as tf
 
+import numpy as np
+
 from data.Dictionary import Dictionary
 
 from model.CodeEncoder import CodeEncoder
 from model.TextEncoder import TextEncoder
 from model.HybridDecoder import HybridDecoder
 from model.Generator import Generator
+from model.GraphSequenceLayer import GraphSequenceLayer
 
 from constants.constants import BOS, EOS
 
@@ -16,7 +19,7 @@ class Hybrid2Seq(tf.keras.Model):
         self.source_vocabulary_size = source_vocabulary_size
         self.target_vocabulary_size = target_vocabulary_size
 
-        self.code_encoder = CodeEncoder(dictonaries, source_vocabulary_size)
+        self.code_encoder = GraphSequenceLayer()
         self.text_encoder = TextEncoder(dictonaries, source_vocabulary_size)
         self.hybrid_decoder = HybridDecoder(target_vocabulary_size)
         self.generator = Generator(target_vocabulary_size)
@@ -33,32 +36,20 @@ class Hybrid2Seq(tf.keras.Model):
     def initialize(self, batch):
         target = batch[2]
         one_hot_target = batch[4]
-        trees = batch[1][0]
+        merged_graph = batch[1][0]
+        node_to_graph_map = batch[1][3]
         lengths = batch[1][1]
         source_text = batch[0]
 
-        tree_encoder_context_padded = []
-        tree_encoder_hidden_0 = []
-        tree_encoder_hidden_1 = []
-
-        for tree in trees:
-            tree_encoder_context, tree_encoder_hidden = self.code_encoder(
-                tree, lengths)
-
-            tree_encoder_context_padded.append(tree_encoder_context)
-            tree_encoder_hidden_0.append(tree_encoder_hidden[0])
-            tree_encoder_hidden_1.append(tree_encoder_hidden[1])
-
-        tree_encoder_context_padded = tf.concat(
-            tree_encoder_context_padded, axis=0)
-
-        tree_encoder_hidden = (tf.concat(tree_encoder_hidden_0, axis=0), tf.concat(
-            tree_encoder_hidden_1, axis=0))
-
+        print(merged_graph)
+        tree_encoder_context_padded = self.code_encoder(merged_graph['node_list'], merged_graph['adjacency_list'], node_to_graph_map, one_hot_target.shape[0], one_hot_target.shape[1])
+        
         text_encoder_hidden, text_encoder_context = self.text_encoder(
             source_text)
         text_encoder_hidden = (tf.expand_dims(
             text_encoder_hidden[0], axis=1), tf.expand_dims(text_encoder_hidden[1], axis=1))
+
+        tree_encoder_hidden = (tf.zeros(text_encoder_hidden[0].shape), tf.zeros(text_encoder_hidden[1].shape))
 
         initial_output = self.initialize_decoder_output(text_encoder_context)
 
