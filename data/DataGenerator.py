@@ -64,8 +64,6 @@ class DataGenerator(tf.compat.v1.keras.utils.Sequence):
         for tree in batch_trees[1:]:
             merged_tree_batch = merge_graphs(merged_tree_batch, tree)
 
-        print('nodes', merged_tree_batch['node_list'])
-
         return (
             (
                 (self.make_tensor(batch_src), src_lengths),

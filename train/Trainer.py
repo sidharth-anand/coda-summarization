@@ -66,6 +66,9 @@ class Trainer:
 
                 self.model.hybrid_decoder.attention.apply_mask(code_attention_mask, text_attention_mask)
 
+                for i, adjacency_list in enumerate(batch[1][0]['adjacency_list']):
+                    batch[1][0]['adjacency_list'][i] = tf.constant(adjacency_list, dtype=tf.int32, shape=(len(adjacency_list), 2))
+
                 outputs = self.model(batch, regression=True)
                 
                 loss_weights = tf.cast(tf.math.not_equal(targets, tf.constant(PAD)), dtype=tf.float32)

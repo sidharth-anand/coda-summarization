@@ -41,7 +41,6 @@ class Hybrid2Seq(tf.keras.Model):
         lengths = batch[1][1]
         source_text = batch[0]
 
-        print(merged_graph)
         tree_encoder_context_padded = self.code_encoder(merged_graph['node_list'], merged_graph['adjacency_list'], node_to_graph_map, one_hot_target.shape[0], one_hot_target.shape[1])
         
         text_encoder_hidden, text_encoder_context = self.text_encoder(

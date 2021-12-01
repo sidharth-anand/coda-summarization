@@ -3,12 +3,10 @@ from tf2_gnn import GNN, GNNInput
 from tf2_gnn.layers import NodesToGraphRepresentationInput, WASGraphRepresentation
 from typing import List, Tuple
 
-from tf2_gnn.layers.nodes_to_graph_representation import NodesToGraphRepresentation
-
 class GraphLayer(tf.keras.layers.Layer):
     def __init__(self, hidden_state_size: int = 512) -> None:
         super(GraphLayer, self).__init__()
-        self.gnn_params = GNN.get_default_hyperparameters()
+        self.gnn_params = GNN.get_default_hyperparameters('ggnn')
         # self.these_hypers = {
         #     "message_calculation_class": "rgcn",
         #     "initial_node_representation_activation": "tanh",
