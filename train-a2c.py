@@ -178,6 +178,7 @@ def create_optim(model):
 
 def create_model(dicts):
     model = Hybrid2Seq(dicts['src'], dicts['src'].size, dicts['tgt'].size)
+    model.graph_encoder = model.code_encoder
     return model
 
 def main():

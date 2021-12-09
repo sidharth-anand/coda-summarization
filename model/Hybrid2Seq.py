@@ -6,6 +6,7 @@ from model.CodeEncoder import CodeEncoder
 from model.TextEncoder import TextEncoder
 from model.HybridDecoder import HybridDecoder
 from model.Generator import Generator
+from model.GraphSequenceLayer import GraphSequenceLayer
 
 from constants.constants import BOS, EOS
 
@@ -16,6 +17,7 @@ class Hybrid2Seq(tf.keras.Model):
         self.source_vocabulary_size = source_vocabulary_size
         self.target_vocabulary_size = target_vocabulary_size
 
+        self.graph_encoder = GraphSequenceLayer()
         self.code_encoder = CodeEncoder(dictonaries, source_vocabulary_size)
         self.text_encoder = TextEncoder(dictonaries, source_vocabulary_size)
         self.hybrid_decoder = HybridDecoder(target_vocabulary_size)
@@ -42,7 +44,7 @@ class Hybrid2Seq(tf.keras.Model):
         tree_encoder_hidden_1 = []
 
         for tree in trees:
-            tree_encoder_context, tree_encoder_hidden = self.code_encoder(
+            tree_encoder_context, tree_encoder_hidden = self.graph_encoder(
                 tree, lengths)
 
             tree_encoder_context_padded.append(tree_encoder_context)
@@ -137,9 +139,5 @@ class Hybrid2Seq(tf.keras.Model):
 
         outputs = tf.stack(outputs, axis=1)
         samples = tf.stack(samples, axis=1)
-
-        print(outputs.shape)
-        print(samples.shape)
-        print('qwe')
 
         return samples, outputs
